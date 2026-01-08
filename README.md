@@ -175,18 +175,17 @@ psychchart can be used programmatically:
 ```python
 from psychchart import load_chart_config, PsychChart
 
-cfg, isolines, zones, points = load_chart_config(
-    "examples/givoni_basic.yaml"
-)
+data = load_chart_config("examples/givoni_basic.yaml")
 
 chart = PsychChart(
-    cfg=cfg,
-    isolines=isolines,
-    zones=zones,
-    points=points,
+    cfg=data["cfg"],
+    isolines=data["isolines"],
+    zones=data["zones"],
+    points=data["points"],
 )
 
 chart.draw()
+
 ```
 
 The `draw()` method returns a Matplotlib `Axes` object, allowing further

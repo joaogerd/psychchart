@@ -129,25 +129,59 @@ def load_chart_config(path: str | pathlib.Path) -> Dict[str, Any]:
     # Isolines
     # ------------------------------------------------------------------
     isolines: Dict[str, IsoSet] = {}
-    for iso in data.get("isos", []):
-        if "name" not in iso:
-            raise ValueError("Each isoline must define a 'name' field.")
-
-        name = iso["name"]
-        values = _ensure_sequence(iso.get("values", []), f"isos[{name}].values")
-
-        # Normalize RH values if applicable
-        if name == "relative_humidity":
-            values = [_normalize_rh(v) for v in values]
-
-        isolines[name] = IsoSet(
-            name=name,
-            values=values,
-            style=iso.get("style", "-"),
-            color=iso.get("color"),
-            cmap=iso.get("cmap"),
-            enabled=iso.get("enabled", True),
-        )
+    
+    raw_isolines = data.get("isolines", None)
+    
+    # Optional legacy support
+    if raw_isolines is None:
+        raw_isolines = data.get("isos", {})
+    
+    # Case 1: declarative dict-based format
+    if isinstance(raw_isolines, dict):
+        for name, iso in raw_isolines.items():
+            values = _ensure_sequence(
+                iso.get("values", []),
+                f"isolines[{name}].values"
+            )
+    
+            if name == "relative_humidity":
+                values = [_normalize_rh(v) for v in values]
+    
+            isolines[name] = IsoSet(
+                name=name,
+                values=values,
+                style=iso.get("style", "-"),
+                color=iso.get("color"),
+                cmap=iso.get("cmap"),
+                enabled=iso.get("enabled", True),
+            )
+    
+    # Case 2: legacy list-based format
+    elif isinstance(raw_isolines, list):
+        for iso in raw_isolines:
+            if "name" not in iso:
+                raise ValueError("Each isoline must define a 'name' field.")
+    
+            name = iso["name"]
+            values = _ensure_sequence(
+                iso.get("values", []),
+                f"isolines[{name}].values"
+            )
+    
+            if name == "relative_humidity":
+                values = [_normalize_rh(v) for v in values]
+    
+            isolines[name] = IsoSet(
+                name=name,
+                values=values,
+                style=iso.get("style", "-"),
+                color=iso.get("color"),
+                cmap=iso.get("cmap"),
+                enabled=iso.get("enabled", True),
+            )
+    
+    else:
+        raise TypeError("'isolines' must be a mapping or a list")
 
     # ------------------------------------------------------------------
     # Zones
@@ -224,7 +258,7 @@ def load_chart_config(path: str | pathlib.Path) -> Dict[str, Any]:
 #   pressure: 101325
 #   output: chart.png
 #
-# isos:
+# isolines:
 #   - name: relative_humidity
 #     values: [30, 50, 70, 90]   # percent accepted
 #     style: "--"

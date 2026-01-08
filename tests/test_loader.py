@@ -13,7 +13,7 @@ def test_loader_basic_yaml():
       t_max: 40
       pressure: 101325
 
-    isolines:
+    isos:
       relative_humidity:
         values: [30, 60, 90]   # em %
 
@@ -32,7 +32,12 @@ def test_loader_basic_yaml():
         path = Path(tmp) / "config.yaml"
         path.write_text(yaml_content, encoding="utf-8")
 
-        cfg, isolines, zones, points = load_chart_config(path)
+        data = load_chart_config(path)
+        
+        cfg      = data["cfg"]
+        isolines = data["isolines"]
+        zones    = data["zones"]
+        points   = data["points"]
 
     # ChartConfig
     assert isinstance(cfg, ChartConfig)
