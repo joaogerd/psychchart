@@ -1,0 +1,50 @@
+chart:
+  t_min: 0
+  t_max: 45
+  y_min: 0
+  y_max: 0.04
+  pressure: 101325
+  output: givoni_chart.png
+  dpi: 300
+  style: seaborn-v0_8
+
+isolines:
+  relative_humidity:
+    enabled: False
+    values: [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+    color: lightgray
+  wet_bulb:
+    enabled: False
+    values: [10,15,20,25,30,35]
+    style: "--"
+    color: gray
+  enthalpy:
+    enabled: False
+    values: [30,45,60,75,90]
+    style: ":"
+    color: steelblue
+  specific_volume:
+    enabled: False
+    values: [0.8,0.9,1.0,1.1]
+    style: "-."
+    color: forestgreen
+  moisture_quantity:
+    enabled: True
+    values: [0.005,0.010,0.015,0.020]   # kg/kg
+    style: "-."
+    color: red
+# ----------------------------  ZONAS  ---------------------------------------
+zones:
+
+  # 6) Principal Comfort Polygon
+  - name: Comfort Zone
+    vertices:
+      [[20,0.2],[22,0.2],[22,0.50],[21,0.80],[20,0.80]]
+#    facecolor: '#b2fab4'
+    facecolor: blue
+#    edgecolor: '#2e7d32'
+    edgecolor: blue
+    linewidth: 2
+
+
+

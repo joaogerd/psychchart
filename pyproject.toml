@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "psychchart"
+version = "0.1.0"
+description = "Psychrometric chart generator with YAML-driven configuration"
+readme = "README.md"
+license = { text = "LGPL-3.0" }
+authors = [
+  { name = "Dr. Joao Gerd Zell de Mattos" }
+]
+requires-python = ">=3.10"
+
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "pyyaml",
+]
+
+[project.scripts]
+psychchart = "psychchart.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

@@ -1,0 +1,2 @@
+[console_scripts]
+psychchart = psychchart.cli:main

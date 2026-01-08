@@ -1,0 +1,58 @@
+# --- domínio geral ----------------------------------------------------------
+chart:
+  t_min: 0            # °C
+  t_max: 50
+  pressure: 101325    # Pa
+  y_min: 0          # << inicia exatamente em 0
+  y_max: 0.085      # (pode manter ou omitir – será calculado se faltar)
+  output: carta.png
+  dpi: 200
+  style: seaborn-v0_8
+
+# --- isolinhas --------------------------------------------------------------
+isolines:
+  relative_humidity:
+    enabled: true          # ⬅ liga/desliga
+    values: [0.2,0.4,0.6,0.8]
+    color: crimson
+    style: "-"
+  wet_bulb:
+    enabled: true
+    values: [10,15,20,25,30,35]
+    color: goldenrod
+    style: "--"
+  moisture_quantity:
+    enabled: true
+    values: [0.005,0.010,0.015,0.020]   # kg/kg
+    color: forestgreen
+    style: "-"
+  enthalpy:
+    enabled: false          # ← desliga
+  specific_volume:
+    enabled: false
+
+# --- zonas (retângulos ou lista de vértices) --------------------------------
+zones:
+  - name: Taurinos
+    t_range: [15, 25]      # °C
+    rh_range: [0.40, 0.70] # 0-1
+    follow_rh: true
+    edgecolor: darkred
+    facecolor: none
+    linewidth: 2
+  - name: Girolando
+    t_range: [15, 28]
+    rh_range: [0.40, 0.75]
+    follow_rh: true
+    edgecolor: magenta
+    facecolor: none
+    linewidth: 2
+
+# --- pontos individuais -----------------------------------------------------
+points:
+  - label: Amostra_A
+    t: 32          # °C
+    rh: 0.55       # 55 %
+    marker: "o"
+    color: black
+
