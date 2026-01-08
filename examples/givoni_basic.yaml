@@ -1,0 +1,72 @@
+# =============================================================================
+# Example: Givoni-style psychrometric chart
+# =============================================================================
+#
+# This example demonstrates a basic psychrometric chart inspired by
+# Givoni's thermal comfort zones.
+#
+# Conventions:
+# - Temperatures are given in °C
+# - Relative humidity values may be provided in % or fraction (0–1)
+# - Pressure is given in Pa
+#
+# This file is fully compatible with:
+#   - psychchart.loader.load_chart_config
+#   - psychchart.plot.PsychChart
+#   - psychchart CLI
+# =============================================================================
+
+chart:
+  # Dry-bulb temperature domain (x-axis)
+  t_min: 0
+  t_max: 40
+
+  # Atmospheric pressure (Pa)
+  pressure: 101325
+
+  # Output file
+  output: givoni_basic.png
+
+  # Optional rendering parameters
+  dpi: 150
+  style: seaborn-v0_8
+
+
+# -----------------------------------------------------------------------------
+# Isolines (isopleths)
+# -----------------------------------------------------------------------------
+isos:
+  - name: relative_humidity
+    # Relative humidity isolines (percent accepted)
+    values: [30, 50, 70, 90]
+    style: "--"
+    color: gray
+
+
+# -----------------------------------------------------------------------------
+# Comfort zones
+# -----------------------------------------------------------------------------
+zones:
+  - name: Givoni comfort zone
+    # Temperature range (°C)
+    t_range: [20, 26]
+
+    # Relative humidity range (% accepted)
+    rh_range: [40, 60]
+
+    # Visual appearance
+    facecolor: lightgreen
+    edgecolor: green
+    linewidth: 1.5
+
+
+# -----------------------------------------------------------------------------
+# Reference points
+# -----------------------------------------------------------------------------
+points:
+  - label: Case A
+    t: 25
+    rh: 50
+    marker: o
+    color: red
+

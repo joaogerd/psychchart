@@ -1,0 +1,196 @@
+# =============================================================================
+# Example: Advanced psychrometric chart with animal comfort zones
+# =============================================================================
+# Comentário geral: este arquivo define completamente um diagrama
+# psicrométrico, incluindo domínio físico, isolinhas, zonas de conforto
+# e pontos de referência.
+#
+# Todas as unidades seguem o padrão do psychchart:
+# - Temperatura em °C
+# - Umidade relativa como fração (0–1) ou porcentagem (0–100)
+# - Pressão em Pascal (Pa)
+# =============================================================================
+
+
+chart:
+  # ---------------------------------------------------------------------------
+  # Parâmetros globais do gráfico
+  # ---------------------------------------------------------------------------
+
+  t_min: 0
+  # Temperatura mínima de bulbo seco no eixo X (°C).
+  # Define o limite esquerdo do gráfico.
+
+  t_max: 50
+  # Temperatura máxima de bulbo seco no eixo X (°C).
+  # Define o limite direito do gráfico.
+
+  pressure: 101325
+  # Pressão atmosférica total do ar em Pascal.
+  # Este valor é usado em TODOS os cálculos psicrométricos
+  # (razão de mistura, volume específico, etc.).
+
+  y_min: 0
+  # Limite inferior do eixo Y (razão de mistura).
+  # Força o gráfico a iniciar exatamente na origem física (W = 0).
+
+  y_max: 0.085
+  # Limite superior do eixo Y (razão de mistura).
+  # Se esta linha fosse removida, o código calcularia automaticamente
+  # um valor baseado na curva de saturação em t_max.
+
+  output: carta.png
+  # Nome do arquivo de saída que será salvo pelo CLI ou pelo código Python.
+
+  dpi: 200
+  # Resolução do arquivo de saída (dots per inch).
+  # Valores maiores produzem imagens mais nítidas.
+
+  style: seaborn-v0_8
+  # Estilo visual do Matplotlib.
+  # Controla cores padrão, grid, fontes e espaçamentos.
+
+
+# -----------------------------------------------------------------------------
+# Isolines (isolinhas psicrométricas)
+# -----------------------------------------------------------------------------
+isos:
+  # A chave "isos" SEMPRE é uma lista.
+  # Cada item da lista representa uma família de isolinhas.
+
+  - name: relative_humidity
+    # Identificador interno da isolinha.
+    # O plot.py usa este nome para decidir qual equação aplicar.
+
+    enabled: true
+    # Liga ou desliga completamente esta família de isolinhas.
+    # Se false, o bloco é ignorado.
+
+    values: [0.2, 0.4, 0.6, 0.8]
+    # Valores de umidade relativa.
+    # Podem ser fornecidos como fração (0–1) ou porcentagem (20–80).
+    # O loader normaliza automaticamente.
+
+    color: crimson
+    # Cor das curvas de umidade relativa.
+
+    style: "-"
+    # Estilo da linha (linha contínua).
+
+  - name: wet_bulb
+    # Isolinhas de temperatura de bulbo úmido constante.
+
+    enabled: true
+    # Ativa o desenho das curvas de bulbo úmido.
+
+    values: [10, 15, 20, 25, 30, 35]
+    # Temperaturas de bulbo úmido (°C) para as isolinhas.
+
+    color: goldenrod
+    # Cor das curvas de bulbo úmido.
+
+    style: "--"
+    # Linha tracejada para diferenciar visualmente.
+
+  - name: moisture_quantity
+    # Isolinhas de razão de mistura constante (W = constante).
+
+    enabled: true
+    # Ativa linhas horizontais de umidade absoluta.
+
+    values: [0.005, 0.010, 0.015, 0.020]
+    # Valores de razão de mistura (kg vapor / kg ar seco).
+
+    color: forestgreen
+    # Cor das linhas horizontais.
+
+    style: "-"
+    # Linha contínua.
+
+  - name: enthalpy
+    # Isolinhas de entalpia do ar úmido.
+
+    enabled: false
+    # Explicitamente desativadas.
+    # Boa prática: manter declarado para documentação.
+
+  - name: specific_volume
+    # Isolinhas de volume específico.
+
+    enabled: false
+    # Desativadas neste exemplo.
+
+
+# -----------------------------------------------------------------------------
+# Zones (zonas de conforto térmico)
+# -----------------------------------------------------------------------------
+zones:
+  # Cada item representa uma zona física no diagrama psicrométrico.
+
+  - name: Taurinos
+    # Nome da zona.
+    # Usado na legenda do gráfico.
+
+    t_range: [15, 25]
+    # Intervalo de temperatura de bulbo seco (°C)
+    # que limita a zona no eixo X.
+
+    rh_range: [0.40, 0.70]
+    # Intervalo de umidade relativa (fração 0–1).
+    # Define a largura vertical da zona.
+
+    follow_rh: true
+    # Se true, a borda da zona segue as curvas reais de umidade relativa,
+    # em vez de formar um retângulo artificial.
+
+    edgecolor: darkred
+    # Cor da borda da zona.
+
+    facecolor: none
+    # Sem preenchimento interno (zona transparente).
+
+    linewidth: 2.0
+    # Espessura da borda da zona.
+
+  - name: Girolando
+    # Segunda zona, representando outra raça ou condição.
+
+    t_range: [15, 28]
+    # Intervalo térmico mais amplo.
+
+    rh_range: [0.40, 0.75]
+    # Faixa de umidade relativa mais tolerante.
+
+    follow_rh: true
+    # Também segue curvas reais de UR.
+
+    edgecolor: magenta
+    # Cor da borda da zona.
+
+    facecolor: none
+    # Zona transparente.
+
+    linewidth: 2.0
+    # Espessura da borda.
+
+
+# -----------------------------------------------------------------------------
+# Points (pontos de referência individuais)
+# -----------------------------------------------------------------------------
+points:
+  - label: Amostra_A
+    # Texto exibido ao lado do ponto no gráfico.
+
+    t: 32
+    # Temperatura de bulbo seco do ponto (°C).
+
+    rh: 0.55
+    # Umidade relativa do ponto.
+    # Pode ser fornecida como 0.55 ou 55 (%).
+
+    marker: "o"
+    # Símbolo Matplotlib do ponto.
+
+    color: black
+    # Cor do ponto e do texto.
+

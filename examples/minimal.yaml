@@ -1,0 +1,28 @@
+# -----------------------------------------------------------------------------
+# Minimal psychrometric chart example
+# -----------------------------------------------------------------------------
+# This is the simplest possible configuration that still produces
+# a valid psychrometric chart.
+# -----------------------------------------------------------------------------
+
+chart:
+  t_min: 0
+  # Minimum dry-bulb temperature shown on the x-axis (°C).
+  # Defines the left boundary of the chart.
+
+  t_max: 35
+  # Maximum dry-bulb temperature shown on the x-axis (°C).
+  # Defines the right boundary of the chart.
+
+
+isolines:
+  # Conceptually, isolines describe families of psychrometric curves.
+
+  relative_humidity:
+    # Relative humidity isolines (most common and intuitive).
+
+    values: [40, 60, 80]
+    # Relative humidity values.
+    # Percent values are accepted and automatically normalized
+    # to fractions (0.4, 0.6, 0.8).
+
