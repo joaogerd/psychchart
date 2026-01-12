@@ -13,12 +13,21 @@ It acts as a bridge between declarative configuration files
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Dict, Any, List
 import pathlib
 
 import yaml
 
-from .config import ChartConfig, IsoSet, Zone, Point
+from .config import (
+    ChartConfig,
+    IsoSet,
+    Zone,
+    Point,
+    IndexConfig,
+    IndexZone,
+    IndexField,
+)
 
 
 # =============================================================================
@@ -76,8 +85,8 @@ def _ensure_sequence(obj, name: str):
     TypeError
         If the object is not iterable.
     """
-    if not hasattr(obj, "__iter__"):
-        raise TypeError(f"'{name}' must be a sequence")
+    if isinstance(obj, (str, bytes)) or not isinstance(obj, Sequence):
+        raise TypeError(f"'{name}' must be a sequence of numbers")
     return obj
 
 
@@ -227,14 +236,71 @@ def load_chart_config(path: str | pathlib.Path) -> Dict[str, Any]:
                 color=p.get("color", "k"),
             )
         )
+    # ------------------------------------------------------------------
+    # Indexes (optional)
+    # ------------------------------------------------------------------
+    indexes = []
+    for idx in data.get("indexes", []):
+        indexes.append(
+            IndexConfig(
+                name=idx["name"],
+                parameters=idx.get("parameters", {}),
+                mode=idx.get("mode", "isolines"),
+                levels=idx.get("levels"),
+                cmap=idx.get("cmap"),
+                style=idx.get("style", ":"),
+                color=idx.get("color"),
+                alpha=idx.get("alpha", 0.6),
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # Index-based zones (optional)
+    # ------------------------------------------------------------------
+    index_zones = []
+    for iz in data.get("index_zones", []):
+        index_zones.append(
+            IndexZone(
+                index=iz["index"],
+                name=iz["name"],
+                range=tuple(iz["range"]),
+                color=iz.get("color", "gray"),
+                alpha=iz.get("alpha", 0.3),
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # Index fields (continuous heatmaps, optional)
+    # ------------------------------------------------------------------
+    index_fields = []
+    for f in data.get("index_fields", []):
+        index_fields.append(
+            IndexField(
+                index=f["index"],
+                cmap=f.get("cmap", "viridis"),
+                levels=f.get("levels"),
+                vmin=f.get("vmin"),
+                vmax=f.get("vmax"),
+                alpha=f.get("alpha", 0.6),
+                colorbar=f.get("colorbar", True),
+            )
+        )
 
     return {
         "cfg": cfg,
         "isolines": isolines,
         "zones": zones,
         "points": points,
+        "indexes": indexes,
+        "index_zones": index_zones,
+        "index_fields": index_fields,
     }
 
+    def load(path):
+        """
+        Alias for load_chart_config (public API).
+        """
+        return load_chart_config(path)
 
 # =============================================================================
 # Usage examples

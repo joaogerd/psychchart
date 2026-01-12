@@ -1,19 +1,10 @@
-# =============================================================================
-# Example: Advanced psychrometric chart with animal comfort zones
-# =============================================================================
-# This file fully defines a psychrometric chart, including:
-# - physical domain
-# - psychrometric isolines
-# - thermal comfort zones
-# - reference points
-#
-# Conventions used throughout this file:
-# - Temperature in degrees Celsius (°C)
-# - Relative humidity as fraction (0–1) or percentage (0–100)
-# - Pressure in Pascals (Pa)
-# =============================================================================
+from psychchart import load_chart_config, PsychChart
+import matplotlib.pyplot as plt
 
-
+# ---------------------------------------------------------------------
+# Exemplo de configuração completa (você pode trocar pelo seu YAML real)
+# ---------------------------------------------------------------------
+yaml = """
 chart:
   # ---------------------------------------------------------------------------
   # Global chart parameters
@@ -126,53 +117,95 @@ isos:
 # Zones (thermal comfort regions)
 # -----------------------------------------------------------------------------
 zones:
-  # Each list item defines a physical region in the psychrometric space.
+  - name: Conforto (Taurinos)
+    # Zona "core" de conforto: mínima ativação termorregulatória,
+    # desempenho preservado, cenário típico com sombra e vento fraco/moderado.
 
-  - name: Taurinos
-    # Name of the zone.
-    # Displayed in the chart legend.
-
-    t_range: [15, 25]
-    # Dry-bulb temperature range (°C) defining the horizontal extent.
-
-    rh_range: [0.40, 0.70]
-    # Relative humidity range (fraction 0–1).
-    # Defines the vertical extent of the zone.
-
+    vertices:
+      # (T, RH) em fração 0–1
+      # Formato "Givoni": topo inclinado e limites práticos.
+      - [16, 0.70]
+      - [16, 0.40]
+      - [22, 0.40]
+      - [25, 0.50]
+      - [24, 0.70]
     follow_rh: true
-    # If true, zone boundaries follow actual relative humidity curves,
-    # rather than forming a rectangular approximation.
 
-    edgecolor: darkred
-    # Color of the zone boundary.
-
+    edgecolor: darkgreen
     facecolor: none
-    # No fill color (transparent zone interior).
+    linewidth: 2.2
 
-    linewidth: 2.0
-    # Width of the zone boundary line.
 
-  - name: Girolando
-    # Second comfort zone, representing a different breed or condition.
+  - name: Conforto permissível (Taurinos)
+    # Zona aceitável/operacional: pode haver alerta leve
+    # (queda pequena de consumo/produção), mas ainda sem estresse moderado.
 
-    t_range: [15, 28]
-    # Wider temperature tolerance.
-
-    rh_range: [0.40, 0.75]
-    # Wider humidity tolerance.
-
+    vertices:
+      - [14, 0.80]
+      - [14, 0.35]
+      - [24, 0.35]
+      - [28, 0.45]
+      - [27, 0.70]
+      - [22, 0.80]
     follow_rh: true
-    # Boundaries follow real RH curves.
 
-    edgecolor: magenta
-    # Zone boundary color.
-
+    edgecolor: goldenrod
     facecolor: none
-    # Transparent interior.
-
     linewidth: 2.0
-    # Boundary line width.
-    #
+  - name: Comfort Zone
+    vertices:
+      [[20,0.2],[22,0.2],[22,0.50],[21,0.80],[20,0.80]]
+#    facecolor: '#b2fab4'
+    facecolor: blue
+#    edgecolor: '#2e7d32'
+    edgecolor: blue
+    linewidth: 2
+
+#  - name: Taurinos
+#    # Name of the zone.
+#    # Displayed in the chart legend.
+#
+#    t_range: [15, 25]
+#    # Dry-bulb temperature range (°C) defining the horizontal extent.
+#
+#    rh_range: [0.40, 0.70]
+#    # Relative humidity range (fraction 0–1).
+#    # Defines the vertical extent of the zone.
+#
+#    follow_rh: true
+#    # If true, zone boundaries follow actual relative humidity curves,
+#    # rather than forming a rectangular approximation.
+#
+#    edgecolor: darkred
+#    # Color of the zone boundary.
+#
+#    facecolor: none
+#    # No fill color (transparent zone interior).
+#
+#    linewidth: 2.0
+#    # Width of the zone boundary line.
+#
+#  - name: Girolando
+#    # Second comfort zone, representing a different breed or condition.
+#
+#    t_range: [15, 28]
+#    # Wider temperature tolerance.
+#
+#    rh_range: [0.40, 0.75]
+#    # Wider humidity tolerance.
+#
+#    follow_rh: true
+#    # Boundaries follow real RH curves.
+#
+#    edgecolor: magenta
+#    # Zone boundary color.
+#
+#    facecolor: none
+#    # Transparent interior.
+#
+#    linewidth: 2.0
+#    # Boundary line width.
+#    #
 index_fields:
   - index: ITU
     cmap: inferno
@@ -185,23 +218,30 @@ indexes:
     levels: [68, 72, 76, 80]
     style: "-"
     color: black
-# -----------------------------------------------------------------------------
-# Reference points
-# -----------------------------------------------------------------------------
-points:
-  - label: Sample_A
-    # Text label shown next to the point.
+"""
 
-    t: 32
-    # Dry-bulb temperature of the point (°C).
+# ---------------------------------------------------------------------
+# Carregar configuração (via loader oficial)
+# ---------------------------------------------------------------------
+import tempfile
+from pathlib import Path
 
-    rh: 0.55
-    # Relative humidity of the point.
-    # Can be provided as fraction (0.55) or percentage (55).
+tmp = Path(tempfile.gettempdir()) / "psychchart_demo.yaml"
+tmp.write_text(yaml)
 
-    marker: "o"
-    # Matplotlib marker symbol.
+data = load_chart_config(tmp)
 
-    color: black
-    # Marker and label color.
+# ---------------------------------------------------------------------
+# Criar e renderizar o gráfico
+# ---------------------------------------------------------------------
+chart = PsychChart(**data)
+ax = chart.draw()
+
+ax.set_title("Psychrometric Chart – Full Pipeline Demo")
+
+plt.tight_layout()
+plt.show()
+
+# Para salvar:
+# plt.savefig("psychchart_full_demo.png", dpi=200)
 

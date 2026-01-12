@@ -24,10 +24,10 @@ often rely on psychrometric variables as inputs.
 Currently implemented indexes
 -----------------------------
 - ITU (Temperature-Humidity Index)
+- HLI (Heat Load Index)
 
 Future extensions may include:
 - BGHI (Black Globe Humidity Index)
-- HLI (Heat Load Index)
 - UTCI (Universal Thermal Climate Index)
 """
 
@@ -40,7 +40,7 @@ from .base import ComfortIndex
 # Concrete index implementations
 # ---------------------------------------------------------------------
 from .iti import ITU
-
+from .hli import HLI
 # ---------------------------------------------------------------------
 # Public symbols exported by this module
 #
@@ -51,5 +51,6 @@ from .iti import ITU
 __all__ = [
     "ComfortIndex",
     "ITU",
+    "HLI",
 ]
 

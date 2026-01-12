@@ -2,7 +2,7 @@
 Temperature-Humidity Index (ITU / THI).
 
 This module implements the Temperature-Humidity Index (ITU),
-also known internationally as the Temperature-Humidity Index (THI).
+lso known internationally as the Temperature-Humidity Index (THI).
 
 The ITU is one of the most widely used empirical indexes for
 assessing thermal comfort and heat stress, especially in
@@ -17,7 +17,7 @@ humid conditions.
 
 Typical formulation (Thom, 1959; adapted forms widely used):
 
-    ITU = T - (0.55 - 0.0055 * RH_percent) * (T - 14.5)
+    ITU = 0.8 * T + rh_percent * (T - 14.3)/100 + 46.3
 
 Where:
 - T           : dry-bulb air temperature [°C]
@@ -34,7 +34,7 @@ Limitations
 - Accuracy decreases under extreme radiation or ventilation.
 - Best interpreted as a *screening index*, not a full heat balance.
 """
-
+import numpy as np
 from .base import ComfortIndex
 
 
@@ -121,7 +121,10 @@ class ITU(ComfortIndex):
         # ------------------------------------------------------------------
         # Input validation
         # ------------------------------------------------------------------
-        if not (0.0 <= RH <= 1.0):
+        # Accept both scalars and arrays
+        RH = np.asarray(RH)
+        
+        if np.any((RH < 0.0) | (RH > 1.0)):
             raise ValueError(
                 "Relative humidity (RH) must be given as a fraction "
                 "between 0 and 1."
@@ -136,7 +139,6 @@ class ITU(ComfortIndex):
         # ------------------------------------------------------------------
         # ITU empirical formulation
         # ------------------------------------------------------------------
-        itu = T - (0.55 - 0.0055 * rh_percent) * (T - 14.5)
-
+        itu = 0.8 * T + rh_percent * (T - 14.3)/100 + 46.3
         return itu
 
