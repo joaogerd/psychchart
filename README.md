@@ -132,6 +132,20 @@ Supported isoline types include:
 
 ---
 
+### Index fields (thermal comfort maps)
+
+psychchart supports the visualization of thermal indexes
+(e.g. ITU, HLI) as continuous fields over the psychrometric domain.
+
+These fields may be rendered using:
+- filled contours (contourf)
+- rasterized meshes (pcolormesh)
+
+Index fields are defined declaratively in YAML and share
+the same computational grid used for isolines.
+
+---
+
 ### Comfort zones (example: animal thermal comfort)
 
 ```yaml
@@ -215,21 +229,47 @@ The CLI:
 ```text
 psychchart/
 ├── docs/
-│   ├── VERSIONING.md      # Versioning policy
-│   ├── VALIDATION.md      # Scientific validation
-│   └── METHODS_TEXT.md    # Reusable methods text
-├── examples/              # User-facing YAML examples
-├── src/psychchart/        # Core package
-│   ├── psychrometrics.py  # Scientific formulations
-│   ├── config.py          # Data models (schema)
-│   ├── loader.py          # YAML loader and normalization
-│   ├── plot.py            # Rendering engine
-│   ├── cli.py             # Command-line interface
-├── tests/                 # Automated tests
-├── CHANGELOG.md
+│   ├── VERSIONING.md      # Versioning policy (SemVer and release rules)
+│   ├── VALIDATION.md      # Scientific validation and assumptions
+│   └── METHODS_TEXT.md    # Reusable methods text for papers and reports
+│
+├── examples/              # User-facing YAML examples and demonstrations
+│
+├── src/psychchart/        # Core Python package
+│   ├── psychrometrics.py  # Scientific psychrometric formulations
+│   │                       # (thermodynamics, humidity ratio, enthalpy, etc.)
+│   │
+│   ├── config.py          # Declarative data models (schema)
+│   │                       # Defines charts, isolines, zones, points and indexes
+│   │
+│   ├── loader.py          # YAML loader and normalization layer
+│   │                       # Reads configuration files and converts inputs
+│   │                       # to validated, normalized internal objects
+│   │
+│   ├── plot/              # Rendering engine (modular backend)
+│   │   ├── __init__.py    # Public plotting API and backend entry point
+│   │   ├── chart.py       # Plot orchestration (figure, axes, layout, z-order)
+│   │   ├── zones.py       # Rendering of psychrometric zones (polygons, fills)
+│   │   ├── isolines.py    # Rendering of psychrometric isolines (RH, WB, h, v)
+│   │   └── indexes.py     # Rendering of thermal index fields (ITU, ITI, HLI)
+│   │
+│   ├── cli.py             # Command-line interface (psychchart <config.yaml>)
+│
+├── tests/                 # Automated tests (numerical + plotting smoke tests)
+│
+├── CHANGELOG.md           # Chronological record of changes
 ├── LICENSE
 └── README.md
 ```
+The project is organized around a strict separation of concerns:
+
+- **psychrometrics**: physical and thermodynamic formulations
+- **config / loader**: declarative configuration and normalization
+- **plot**: visualization and rendering only
+- **CLI**: thin execution layer
+
+This design ensures scientific transparency, reproducibility,
+and long-term maintainability.
 
 ---
 
