@@ -1,10 +1,3 @@
-from psychchart import load_chart_config, PsychChart
-import matplotlib.pyplot as plt
-
-# ---------------------------------------------------------------------
-# Exemplo de configuração completa (você pode trocar pelo seu YAML real)
-# ---------------------------------------------------------------------
-yaml = """
 # =============================================================================
 # Psychrometric chart – ITU full visualization
 # =============================================================================
@@ -130,30 +123,4 @@ points:
     rh: 0.65
     marker: "s"
     color: navy
-"""
-
-# ---------------------------------------------------------------------
-# Carregar configuração (via loader oficial)
-# ---------------------------------------------------------------------
-import tempfile
-from pathlib import Path
-
-tmp = Path(tempfile.gettempdir()) / "psychchart_demo.yaml"
-tmp.write_text(yaml)
-
-data = load_chart_config(tmp)
-
-# ---------------------------------------------------------------------
-# Criar e renderizar o gráfico
-# ---------------------------------------------------------------------
-chart = PsychChart(**data)
-ax = chart.draw()
-
-ax.set_title("Psychrometric Chart – Full Pipeline Demo")
-
-plt.tight_layout()
-plt.show()
-
-# Para salvar:
-# plt.savefig("psychchart_full_demo.png", dpi=200)
 

@@ -14,12 +14,15 @@ from psychchart.config import (
     IndexConfig,
     IndexZone,
     IndexField,
+    PathConfig,
+    DensityFieldConfig
 )
 
 # Low-level drawing helpers (single responsibility)
 from .layers import ZORDER
 from .isolines import draw_isolines
 from .zones import draw_zones
+from .density import draw_density_field
 from .indexes import (
     draw_index_isolines,
     draw_index_zones,
@@ -81,6 +84,9 @@ class PsychChart:
         Zones derived from index thresholds.
     index_fields : list[IndexField], optional
         Continuous index fields rendered as heatmaps.
+    paths: Optional[List[PathConfig]] = None
+        Translate observations into a psychrometric path.
+
 
     Notes
     -----
@@ -91,11 +97,116 @@ class PsychChart:
 
     # ------------------------------------------------------------------
     # Core configuration
+# =============================================================================
+# Main rendering engine
+# =============================================================================
+@dataclass
+class PsychChart:
+    """
+    Psychrometric chart rendering engine.
+
+    This class is the **central orchestration layer** of the psychrometric
+    chart system. It coordinates all rendering steps and delegates
+    numerical computation, geometry construction, and domain-specific
+    logic to specialized helper modules.
+
+    The design philosophy intentionally mirrors Matplotlib itself:
+    - imperative
+    - explicit
+    - stateless between draw calls
+
+    This class DOES NOT perform calculations.
+    It only **organizes and executes the drawing pipeline**.
+
+    Responsibilities
+    ----------------
+    - Initialize Matplotlib figure and axes
+    - Prepare the thermodynamic domain (T, W, saturation curve)
+    - Control semantic drawing order (layering)
+    - Dispatch rendering to specialized helpers:
+        * isolines
+        * zones
+        * points
+        * index isolines
+        * index zones
+        * index fields
+        * density fields
+        * psychrometric paths
+    - Apply axis formatting, labels, limits, and grid
+
+    Non-responsibilities
+    --------------------
+    - YAML / JSON parsing
+    - Configuration validation
+    - Psychrometric calculations
+    - Statistical analysis
+    - File I/O (savefig)
+    - Interactive callbacks
+
+    This strict separation ensures:
+    - scientific transparency,
+    - predictable rendering,
+    - easy extensibility,
+    - reproducibility of figures.
+
+    Parameters
+    ----------
+    cfg : ChartConfig
+        Global chart configuration defining:
+        - dry-bulb temperature limits
+        - reference pressure
+        - figure size and style
+        - axis labels and ticks
+
+    isolines : dict[str, IsoSet], optional
+        Classical psychrometric isolines such as:
+        - relative humidity
+        - enthalpy
+        - wet-bulb temperature
+        - specific volume
+
+    zones : list[Zone], optional
+        Geometric zones defined in temperature–humidity space.
+        These typically represent comfort, risk, or design regions.
+
+    points : list[Point], optional
+        Discrete reference points plotted on the chart
+        (e.g., measurements, design conditions).
+
+    indexes : list[IndexConfig], optional
+        Index isolines derived from bioclimatic or thermal indices
+        (e.g., ITU, THI, HLI).
+
+    index_zones : list[IndexZone], optional
+        Categorical zones derived from index thresholds
+        (e.g., stress classes).
+
+    index_fields : list[IndexField], optional
+        Continuous index fields rendered as background heatmaps.
+
+    paths : list[PathConfig], optional
+        Ordered psychrometric trajectories, typically derived
+        from time-series observations.
+
+    density_fields : list[DensityField], optional
+        Density or frequency fields representing the distribution
+        of observed psychrometric states.
+
+    Notes
+    -----
+    - All inputs are assumed to be **validated and coherent**.
+    - This class performs **no semantic checks**.
+    - Designed for batch rendering of scientific-quality figures.
+    - The chart can be redrawn multiple times without side effects.
+    """
+
+    # ------------------------------------------------------------------
+    # Core chart configuration
     # ------------------------------------------------------------------
     cfg: ChartConfig
 
     # ------------------------------------------------------------------
-    # Psychrometric isolines (RH, enthalpy, etc.)
+    # Classical psychrometric isolines
     # ------------------------------------------------------------------
     isolines: Optional[Dict[str, IsoSet]] = None
 
@@ -115,14 +226,24 @@ class PsychChart:
     indexes: Optional[List[IndexConfig]] = None
 
     # ------------------------------------------------------------------
-    # Index-based zones (categorical)
+    # Index-based categorical zones
     # ------------------------------------------------------------------
     index_zones: Optional[List[IndexZone]] = None
 
     # ------------------------------------------------------------------
-    # Index continuous fields (heatmaps)
+    # Continuous index fields (heatmaps)
     # ------------------------------------------------------------------
     index_fields: Optional[List[IndexField]] = None
+
+    # ------------------------------------------------------------------
+    # Psychrometric paths (temporal trajectories)
+    # ------------------------------------------------------------------
+    paths: Optional[List[PathConfig]] = None
+
+    # ------------------------------------------------------------------
+    # Density / frequency fields
+    # ------------------------------------------------------------------
+    density_fields: Optional[List[DensityFieldConfig]] = None
 
     # ------------------------------------------------------------------
     # Post-initialization normalization
@@ -144,6 +265,8 @@ class PsychChart:
         self.indexes = self.indexes or []
         self.index_zones = self.index_zones or []
         self.index_fields = self.index_fields or []
+        self.paths = self.paths or []
+        self.density_fields = self.density_fields or []
 
         # Internal counter used for unique labeling of index zones
         self._index_zone_counter = 0
@@ -294,10 +417,13 @@ class PsychChart:
         self._prepare_domain()
 
         # Semantic layering (background → foreground)
-        self._draw_saturation_curve()
-
+        
+        draw_density_field(self.ax, self)   # fundo absoluto
         draw_index_fields(self.ax, self)   # fundo
         draw_index_zones(self.ax, self)    # fundo categórico
+
+        self._draw_saturation_curve()
+        
         draw_isolines(self.ax, self)       # campo físico
         draw_zones(self.ax, self)          # conforto (frente)
         self._draw_points()                # observações
