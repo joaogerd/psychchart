@@ -20,6 +20,7 @@ Typical responsibilities handled here:
 
 All orchestration must be done by the caller.
 """
+from __future__ import annotations
 
 import numpy as np
 from matplotlib.axes import Axes
@@ -27,85 +28,12 @@ from matplotlib.path import Path
 from matplotlib.patches import PathPatch
 from matplotlib.colors import ListedColormap, BoundaryNorm
 
-from psychchart.indexes import ITU, HLI
+from psychchart.indexes.engine import evaluate_index
 from psychchart.config import IndexConfig, IndexZone, IndexField
 from psychchart.psychrometrics import Psychrometrics
 from psychchart.plot.index_profiles import get_index_profile
 from .layers import ZORDER
 
-
-# =============================================================================
-# Index dispatch layer
-# =============================================================================
-def _get_index_callable(chart, name: str):
-    """
-    Resolve an index identifier into a callable function.
-
-    This helper maps a **string-based index name** to a callable
-    implementing the corresponding physical formulation.
-
-    All returned callables follow the same unified signature::
-
-        f(T, RH) -> ndarray
-
-    where:
-    - T  : dry-bulb temperature (°C), scalar or ndarray
-    - RH : relative humidity (0–1), scalar or ndarray
-
-    This unification allows generic downstream rendering
-    (contours, filled regions, heatmaps) without knowing
-    the internal details of each index.
-
-    Parameters
-    ----------
-    chart : PsychChart
-        Chart context providing global configuration, such as:
-        - solar radiation
-        - wind speed
-        - pressure (if needed in the future)
-    name : str
-        Index identifier (e.g., ``"ITU"``, ``"HLI"``).
-
-    Returns
-    -------
-    callable
-        Function computing the requested index.
-
-    Raises
-    ------
-    ValueError
-        If the index name is not supported.
-
-    Notes
-    -----
-    - New indices must be explicitly added here.
-    - Explicit dispatching is preferred over reflection
-      for scientific transparency.
-    """
-
-    # ------------------------------------------------------------------
-    # Temperature–Humidity Index (ITU)
-    # ------------------------------------------------------------------
-    if name == "ITU":
-        # Depends only on temperature and relative humidity
-        return lambda T, RH: ITU.compute(T, RH)
-
-    # ------------------------------------------------------------------
-    # Heat Load Index (HLI)
-    # ------------------------------------------------------------------
-    if name == "HLI":
-        # Requires auxiliary environmental parameters
-        return lambda T, RH: HLI.compute(
-            T,
-            RH,
-            SR=chart.cfg.solar_radiation,
-            WS=chart.cfg.wind_speed,
-        )
-
-    # ------------------------------------------------------------------
-    # Unsupported index
-    # ------------------------------------------------------------------
-    raise ValueError(f"Unknown index: {name}")
 
 def _clip_to_saturation(ax, artist, T, W_sat):
     """
@@ -218,7 +146,13 @@ def _clip_to_saturation(ax, artist, T, W_sat):
     # ------------------------------------------------------------------
     artist.set_clip_path(patch)
     
-def _compute_psychrometric_index_field(chart, index_name: str, n: int = 300):
+def _compute_psychrometric_index_field(
+    chart,
+    index: str,
+    *,
+    params: dict | None = None,
+    n: int = 300,
+):    
     """
     Compute a bioclimatic index field over the psychrometric domain (T, W).
 
@@ -245,9 +179,8 @@ def _compute_psychrometric_index_field(chart, index_name: str, n: int = 300):
         - temperature limits (cfg.t_min, cfg.t_max)
         - atmospheric pressure (cfg.pressure)
         - auxiliary variables required by some indexes
-    index_name : str
+    index : str
         Identifier of the index to be computed (e.g., ``"ITU"``, ``"HLI"``).
-        This name is resolved to a callable via ``_get_index_callable``.
     n : int, optional
         Resolution of the computational grid in each dimension.
         Default is 300, resulting in an n × n grid.
@@ -283,7 +216,7 @@ def _compute_psychrometric_index_field(chart, index_name: str, n: int = 300):
 
     >>> TT, WW, Z = _compute_psychrometric_index_field(
     ...     chart,
-    ...     index_name="ITU",
+    ...     index="ITU",
     ...     n=200,
     ... )
 
@@ -292,7 +225,9 @@ def _compute_psychrometric_index_field(chart, index_name: str, n: int = 300):
 
     >>> ax.contourf(TT, WW, Z, levels=20)
     """
-
+    if params is None:
+        params = {}
+        
     # ------------------------------------------------------------------
     # 1. Dry-bulb temperature domain (°C)
     # ------------------------------------------------------------------
@@ -344,77 +279,22 @@ def _compute_psychrometric_index_field(chart, index_name: str, n: int = 300):
     RH = np.clip(RH, 0.0, 1.0)
 
     # ------------------------------------------------------------------
-    # 7. Resolve index callable
-    # ------------------------------------------------------------------
-    # Maps index_name → f(T, RH)
-    f = _get_index_callable(chart, index_name)
-
-    # ------------------------------------------------------------------
     # 8. Compute index field
     # ------------------------------------------------------------------
-    Z = f(TT, RH)
+    Z = evaluate_index(
+        index,
+        TT,
+        RH,
+        params=params
+    )
 
     return TT, WW, Z
-
-# =============================================================================
-# Computational grid builder
-# =============================================================================
-def _compute_index_grid(chart, index_name: str, *, n: int = 300):
-    """
-    Compute an index over a regular psychrometric grid.
-
-    This function builds a **uniform grid in (T, RH) space**
-    using the chart configuration and evaluates the selected
-    index at each grid point.
-
-    Parameters
-    ----------
-    chart : PsychChart
-        Chart context providing:
-        - temperature limits
-        - index configuration
-    index_name : str
-        Index identifier (e.g., ``"ITU"``, ``"HLI"``).
-    n : int, optional
-        Number of grid points in each dimension (default: 300).
-
-    Returns
-    -------
-    TT : ndarray
-        2D grid of dry-bulb temperature (°C).
-    RR : ndarray
-        2D grid of relative humidity (0–1).
-    Z : ndarray
-        Computed index field.
-
-    Notes
-    -----
-    - RH is clipped to [0.01, 1.0] to avoid singularities.
-    - No saturation masking is applied here.
-    """
-
-    # ------------------------------------------------------------------
-    # Build thermodynamic axes
-    # ------------------------------------------------------------------
-    T = np.linspace(chart.cfg.t_min, chart.cfg.t_max, n)
-    RH = np.linspace(0.01, 1.0, n)
-
-    # Create full 2D mesh
-    TT, RR = np.meshgrid(T, RH)
-
-    # Resolve index callable
-    f = _get_index_callable(chart, index_name)
-
-    # Evaluate index on the grid
-    Z = f(TT, RR)
-
-    return TT, RR, Z
 
 
 # =============================================================================
 # Index isolines
 # =============================================================================
-def _draw_index_isolines(chart, ax: Axes, idx: IndexConfig):
+def _draw_index_isolines(chart, ax: Axes, config: IndexConfig):
     """
     Draw contour lines (isolines) of a bioclimatic index.
 
@@ -427,7 +307,7 @@ def _draw_index_isolines(chart, ax: Axes, idx: IndexConfig):
         Chart context.
     ax : matplotlib.axes.Axes
         Axes where isolines will be drawn.
-    idx : IndexConfig
+    config : IndexConfig
         Index configuration (levels, style, color).
 
     Notes
@@ -436,23 +316,27 @@ def _draw_index_isolines(chart, ax: Axes, idx: IndexConfig):
     - Labels are rendered directly on the isolines.
     """
 
-    TT, WW, Z = _compute_psychrometric_index_field(chart, field.index)
+    TT, WW, Z = _compute_psychrometric_index_field(
+        chart,
+        config.index,
+        params=config.parameters,
+    )
 
     # Draw isolines
     cs = ax.contour(
         TT,
         WW,
         Z,
-        levels=idx.levels,
-        linestyles=idx.style,
-        colors=idx.color,
+        levels=config.levels,
+        linestyles=config.style,
+        colors=config.color,
         zorder=ZORDER['isolines'],
     )
 
     # Inline labels for clarity
     ax.clabel(
         cs,
-        fmt=lambda v: f"{idx.name} = {v:.0f}",
+        fmt=lambda v: f"{config.name} = {v:.0f}",
         fontsize=8,
     )
 
@@ -485,7 +369,11 @@ def _draw_index_zone(chart, ax: Axes, zone: IndexZone):
     - Text labels are stacked vertically in axes coordinates.
     """
 
-    TT, WW, Z = _compute_psychrometric_index_field(chart, field.index)
+    TT, WW, Z = _compute_psychrometric_index_field(
+        chart,
+        zone.index,
+        params=zone.parameters,
+    )
 
     # Filled region
     ax.contourf(
@@ -515,7 +403,7 @@ def _draw_index_zone(chart, ax: Axes, zone: IndexZone):
 # =============================================================================
 # Continuous index fields (heatmaps)
 # =============================================================================
-def _draw_index_field(chart, ax: Axes, field):
+def _draw_index_field(chart, ax: Axes, field: IndexField):
     """
     Render a continuous psychrometric index field as a background layer.
 
@@ -578,7 +466,9 @@ def _draw_index_field(chart, ax: Axes, field):
     # WW : 2D humidity ratio grid (kg/kg)
     # Z  : computed index values
     TT, WW, Z = _compute_psychrometric_index_field(
-        chart, field.index
+        chart,
+        field.index,
+        params=field.parameters,
     )
 
     # ------------------------------------------------------------------

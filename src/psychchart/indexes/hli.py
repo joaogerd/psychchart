@@ -152,4 +152,6 @@ class HLI(ComfortIndex):
         )
 
         return hli
-
+    @staticmethod
+    def evaluate(T, RH, SR, WS, **params):
+        return HLI.compute(T, RH, SR, WS)

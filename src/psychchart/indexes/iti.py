@@ -141,4 +141,7 @@ class ITU(ComfortIndex):
         # ------------------------------------------------------------------
         itu = 0.8 * T + rh_percent * (T - 14.3)/100 + 46.3
         return itu
-
+    
+    @staticmethod
+    def evaluate(T, RH, **params):
+        return ITU.compute(T, RH)

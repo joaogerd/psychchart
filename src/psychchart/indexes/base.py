@@ -1,109 +1,161 @@
-"""
-Base classes for thermal and bioclimatic comfort indexes.
-
-This module defines abstract base classes intended to standardize
-the implementation of empirical or semi-empirical thermal comfort
-and heat stress indexes.
-
-Important conceptual note
--------------------------
-Thermal/bioclimatic indexes (e.g., THI, HLI, UTCI, BGHI) are **not**
-psychrometric relationships themselves. Instead, they *use*
-meteorological and physiological variables (temperature, humidity,
-radiation, wind, etc.) to interpret **thermal comfort or heat stress**
-conditions for humans or animals.
-
-These base classes provide a consistent API to:
-- enforce documentation of required inputs;
-- allow interchangeable use of different indexes;
-- support extensibility in scientific and operational workflows.
-"""
-
 from abc import ABC, abstractmethod
+from typing import Union
+import numpy as np
+
+# ----------------------------------------------------------------------
+# Public type alias for scalar or vector inputs
+# ----------------------------------------------------------------------
+ArrayLike = Union[float, np.ndarray]
 
 
 class ComfortIndex(ABC):
     """
     Abstract base class for thermal and bioclimatic comfort indexes.
 
-    This class defines the minimal interface that all comfort or
-    heat-stress indexes must implement. Each index is assumed to
-    represent a *scalar diagnostic quantity* derived from one or
-    more environmental or physiological variables.
+    This class defines the **minimal and canonical interface**
+    that all thermal comfort or heat-stress indexes must follow
+    in the psychchart ecosystem.
+
+    Conceptual model
+    ----------------
+    A comfort index is treated as a **pure diagnostic function**
+    that maps environmental conditions to a scalar indicator of
+    thermal comfort or heat stress.
+
+    Design contract
+    ---------------
+    All subclasses MUST obey the following rules:
+
+    1. Stateless
+       - Index classes must not store internal state.
+       - All required information must be passed explicitly
+         during evaluation.
+
+    2. Canonical input space
+       - Evaluation is always performed in:
+         - dry-bulb temperature (T, °C)
+         - relative humidity (RH, fraction 0–1)
+
+    3. Explicit parameters
+       - Any additional environmental or physiological variables
+         (e.g., wind speed, solar radiation) must be passed
+         explicitly via ``**params``.
+
+    4. Vectorized behavior
+       - Implementations must support both scalar inputs and
+         NumPy arrays transparently.
+
+    This strict contract ensures that:
+    - indexes are interchangeable,
+    - plotting logic remains generic,
+    - scientific assumptions are explicit,
+    - and future extensions (e.g., new indexes) remain safe.
+
+    Responsibilities
+    ----------------
+    - Define the evaluation interface for comfort indexes
+    - Enforce consistency across different index implementations
+
+    Non-responsibilities
+    --------------------
+    - Psychrometric conversions (T–RH → W, h, etc.)
+    - Input validation or unit conversion
+    - Plotting or visualization
+    - Configuration or parameter storage
 
     Attributes
     ----------
     name : str
-        Human-readable name of the index (e.g., ``"THI"``, ``"HLI"``,
-        ``"UTCI"``). Subclasses should override this attribute.
+        Human-readable identifier of the index
+        (e.g., ``"ITU"``, ``"THI"``, ``"HLI"``, ``"UTCI"``).
+
+        This attribute is used for:
+        - labeling plots,
+        - legend entries,
+        - dispatching logic.
 
     Notes
     -----
-    - This class does **not** impose any specific set of inputs.
-      Each index formulation is free to define its own required
-      variables (e.g., air temperature, relative humidity, wind speed).
-    - Implementations should clearly document:
-        * required keyword arguments,
-        * units of each variable,
-        * valid ranges (if applicable),
-        * scientific references.
+    - Subclasses should normally implement ``evaluate`` as a
+      ``@staticmethod`` to reinforce statelessness.
+    - This base class intentionally avoids enforcing a specific
+      unit system beyond what is documented.
     """
 
-    #: Human-readable name of the index
+    #: Human-readable name of the index (must be overridden by subclasses)
     name: str
 
+    # ------------------------------------------------------------------
+    # Canonical evaluation interface
+    # ------------------------------------------------------------------
+    @staticmethod
     @abstractmethod
-    def compute(self, **kwargs):
+    def evaluate(
+        T: ArrayLike,
+        RH: ArrayLike,
+        **params,
+    ) -> ArrayLike:
         """
-        Compute the thermal comfort or heat-stress index.
+        Evaluate the comfort index.
 
-        This abstract method must be implemented by all subclasses.
-        The method signature uses keyword arguments to allow flexible
-        and explicit specification of required inputs.
+        This method defines the **canonical computation interface**
+        shared by all comfort and bioclimatic indexes.
+
+        Implementations must accept both scalars and NumPy arrays
+        and return values with matching shape.
 
         Parameters
         ----------
-        **kwargs : dict
-            Keyword arguments required to compute the index.
-            The exact set of parameters depends on the specific
-            index implementation.
+        T : float or numpy.ndarray
+            Dry-bulb air temperature [°C].
+
+        RH : float or numpy.ndarray
+            Relative humidity as a fraction in the range [0, 1].
+
+        **params : dict
+            Index-specific auxiliary parameters.
+
+            Examples include:
+            - ``WS`` : wind speed [m s⁻¹]
+            - ``SR`` : solar radiation [W m⁻²]
+            - ``MR`` : metabolic rate
+            - ``CLO`` : clothing insulation
+
+            The meaning and units of these parameters are defined
+            by each concrete index implementation.
 
         Returns
         -------
-        float
-            Computed value of the comfort or heat-stress index.
+        float or numpy.ndarray
+            Computed index value(s), with shape compatible
+            with the input ``T`` and ``RH``.
 
         Raises
         ------
-        KeyError
-            If a required input variable is missing.
-        ValueError
-            If input values are outside acceptable physical ranges.
-
-        Notes
-        -----
-        Implementations should:
-        - explicitly validate inputs;
-        - document expected units (e.g., °C, %, m s⁻¹);
-        - remain side-effect free (pure computation).
+        NotImplementedError
+            If the subclass does not implement this method.
 
         Examples
         --------
-        A minimal example of a concrete implementation::
+        Scalar usage:
 
-            class THI(ComfortIndex):
-                name = "Temperature-Humidity Index"
+        >>> ITUIndex.evaluate(T=30.0, RH=0.65)
+        78.4
 
-                def compute(self, T, RH):
-                    # T  : air temperature [°C]
-                    # RH : relative humidity [0–1]
-                    return T - (0.55 - 0.55 * RH) * (T - 14.5)
+        Vectorized usage:
 
-        Usage example::
+        >>> T = np.array([25.0, 30.0, 35.0])
+        >>> RH = np.array([0.5, 0.6, 0.7])
+        >>> ITUIndex.evaluate(T, RH)
+        array([72.1, 78.4, 84.9])
 
-            thi = THI()
-            value = thi.compute(T=30.0, RH=0.60)
-            print(value)
+        With auxiliary parameters:
+
+        >>> HLIIndex.evaluate(
+        ...     T, RH,
+        ...     WS=2.0,
+        ...     SR=600.0
+        ... )
         """
         raise NotImplementedError
 
