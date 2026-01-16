@@ -243,7 +243,8 @@ def load_chart_config(path: str | pathlib.Path) -> Dict[str, Any]:
     for idx in data.get("indexes", []):
         indexes.append(
             IndexConfig(
-                name=idx["name"],
+                index=idx["name"],
+                name=idx.get("label", idx["name"]),
                 parameters=idx.get("parameters", {}),
                 mode=idx.get("mode", "isolines"),
                 levels=idx.get("levels"),
@@ -296,11 +297,11 @@ def load_chart_config(path: str | pathlib.Path) -> Dict[str, Any]:
         "index_fields": index_fields,
     }
 
-    def load(path):
-        """
-        Alias for load_chart_config (public API).
-        """
-        return load_chart_config(path)
+def load(path):
+    """
+    Alias for load_chart_config (public API).
+    """
+    return load_chart_config(path)
 
 # =============================================================================
 # Usage examples

@@ -23,7 +23,6 @@ Their main purpose is to:
 from dataclasses import dataclass, field
 from typing import Sequence, List, Optional, Tuple, Dict, Any
 
-
 # =============================================================================
 # Chart-level configuration
 # =============================================================================
@@ -360,8 +359,11 @@ class IndexConfig:
     ...     levels=[70, 80, 90, 100],
     ... )
     """
-
+    
     # Identifier of the thermal or bioclimatic index (e.g., THI, HLI)
+    index: str
+
+    # Descriptive name (used in legends and annotations)
     name: str
 
     # Rendering mode of the index (isolines, filled, both, etc.)
@@ -384,10 +386,10 @@ class IndexConfig:
 
     # Transparency for filled modes
     alpha: float = 0.6
+
 # =============================================================================
 # Index-based Zone configuration
 # =============================================================================
-
 @dataclass
 class IndexZone:
     """
@@ -493,6 +495,11 @@ class IndexZone:
     # Transparency level of the zone fill
     alpha: float = 0.3
 
+    # Index-specific parameters passed to the computation engine
+    parameters: Dict[str, Any] = field(default_factory=dict)
+# =============================================================================
+# Index-Field configuration
+# =============================================================================
 @dataclass
 class IndexField:
     """
@@ -605,149 +612,262 @@ class IndexField:
     # Whether a colorbar should be displayed
     colorbar: bool = True
 
+    # Index-specific parameters passed to the computation engine
+    parameters: Dict[str, Any] = field(default_factory=dict)
 
 # =============================================================================
-# Usage examples
+# Definition of a psychrometric density field.
 # =============================================================================
-#
-# Example 1: Programmatic configuration
-#
-# >>> from psychchart.config import (
-# ...     ChartConfig, IsoSet, Zone, Point, IndexConfig, IndexZone
-# ... )
-#
-# >>> cfg = ChartConfig(
-# ...     t_min=5,
-# ...     t_max=40,
-# ...     output="psychchart.png",
-# ...     style="seaborn-v0_8"
-# ... )
-#
-# >>> rh_isos = IsoSet(
-# ...     name="relative_humidity",
-# ...     values=[0.3, 0.5, 0.7, 0.9],
-# ...     style="--"
-# ... )
-#
-# >>> comfort_zone = Zone(
-# ...     name="Thermal comfort",
-# ...     t_range=(18, 26),
-# ...     rh_range=(0.4, 0.7),
-# ...     facecolor="lightgreen",
-# ...     edgecolor="green"
-# ... )
-#
-# >>> ref_point = Point(
-# ...     label="Observed condition",
-# ...     t=30,
-# ...     rh=0.65,
-# ...     marker="o",
-# ...     color="red"
-# ... )
-#
-# >>> thi_cfg = IndexConfig(
-# ...     name="THI",
-# ...     mode="isolines",
-# ...     levels=[60, 65, 70, 75, 80],
-# ...     style=":",
-# ...     color="black"
-# ... )
-#
-# >>> thi_comfort = IndexZone(
-# ...     index="THI",
-# ...     name="Comfort",
-# ...     range=(0.0, 72.0),
-# ...     color="green",
-# ...     alpha=0.25
-# ... )
-#
-# >>> thi_alert = IndexZone(
-# ...     index="THI",
-# ...     name="Heat stress",
-# ...     range=(72.0, 78.0),
-# ...     color="orange",
-# ...     alpha=0.3
-# ... )
-#
-# >>> thi_danger = IndexZone(
-# ...     index="THI",
-# ...     name="Severe heat stress",
-# ...     range=(78.0, 100.0),
-# ...     color="red",
-# ...     alpha=0.35
-# ... )
-#
-# >>> itu_field = IndexField(
-# ...     index="ITU",
-# ...     levels=20,
-# ...     cmap="plasma",
-# ...     alpha=0.6
-# ... )
-#
-# =============================================================================
-# Example 2: Conceptual YAML-driven workflow
-# =============================================================================
-#
-# This example illustrates how the configuration models can be
-# serialized in YAML and later interpreted by a loader or plotting
-# engine.
-#
-# chart:
-#   t_min: 0
-#   t_max: 50
-#   pressure: 101325
-#   output: chart.png
-# 
-# isos:
-#   - name: relative_humidity
-#     values: [0.3, 0.5, 0.7, 0.9]
-#     style: "--"
-# 
-# zones:
-#   - name: Comfort zone
-#     t_range: [18, 26]
-#     rh_range: [0.4, 0.7]
-#     facecolor: lightgreen
-#     edgecolor: green
-# 
-# points:
-#   - label: Station A
-#     t: 32
-#     rh: 0.6
-#     marker: o
-#     color: red
-#
-# indexes:
-#   - name: ITU
-#     mode: isolines
-#     levels: [72, 78, 82]
-#     style: ":"
-#     color: darkred
-#
-# index_zones:
-#   - index: THI
-#     name: Comfort
-#     range: [0.0, 72.0]
-#     color: green
-#     alpha: 0.25
-# 
-#   - index: THI
-#     name: Heat stress
-#     range: [72.0, 78.0]
-#     color: orange
-#     alpha: 0.3
-# 
-#   - index: THI
-#     name: Severe heat stress
-#     range: [78.0, 100.0]
-#     color: red
-#     alpha: 0.35
-#
-# index_fields:
-#   - index: ITU
-#     cmap: inferno
-#     levels: 20
-#     alpha: 0.6
-#     colorbar: true
+@dataclass
+class DensityFieldConfig:
+    """
+    Declarative definition of a psychrometric density field.
 
+    A ``DensityFieldConfig`` describes how the **density of observed
+    psychrometric states** should be computed and visualized over
+    the psychrometric chart domain.
+
+    Typical use cases include:
+    - frequency maps of observed (T, RH) conditions,
+    - probability density visualization of climate states,
+    - identification of dominant comfort or stress regimes,
+    - exploratory analysis of large observational datasets.
+
+    This class is purely declarative.
+    It does NOT:
+    - compute histograms or densities,
+    - perform psychrometric conversions,
+    - normalize or rescale data,
+    - perform plotting or rendering.
+
+    All numerical computation and rendering must be handled by
+    higher-level plotting logic (e.g., ``draw_density_field``).
+
+    Parameters
+    ----------
+    bins : tuple of int, optional
+        Number of bins used to discretize the psychrometric domain
+        in (T, RH) space, given as ``(n_T, n_RH)``.
+
+        Higher values result in finer resolution but increased
+        computational cost.
+
+        Default is ``(60, 60)``.
+    cmap : str, optional
+        Matplotlib colormap name used to render the density field.
+        Default is ``"viridis"``.
+    vmin, vmax : float, optional
+        Lower and upper bounds for color normalization.
+
+        If None, Matplotlib determines limits automatically
+        from the computed density values.
+    alpha : float, optional
+        Transparency of the density field (0 = fully transparent,
+        1 = fully opaque). Default is ``0.6``.
+    colorbar : bool, optional
+        Whether to draw a colorbar associated with the density field.
+        Default is ``True``.
+    normalize : bool, optional
+        Controls the interpretation of the density field:
+
+        - ``True``  → values represent a probability density
+          (integrates to 1 over the domain).
+        - ``False`` → values represent raw occurrence counts
+          per bin.
+
+        Default is ``True``.
+
+    Notes
+    -----
+    - Density computation is typically performed using a 2D histogram
+      in (T, RH) or (T, W) space.
+    - When ``normalize=True``, the resulting field is suitable for
+      probabilistic interpretation and comparison across datasets
+      of different sizes.
+    - Clipping to the saturation curve (100 % RH) should be handled
+      explicitly by the rendering layer.
+
+    Design considerations
+    ---------------------
+    - This class mirrors the philosophy of ``IndexField`` and
+      ``IndexZone``: configuration only, no logic.
+    - Keeping density configuration separate from observations
+      allows reuse across multiple charts and datasets.
+    - Histogram resolution is specified in thermodynamic space,
+      not pixel space.
+
+    Examples
+    --------
+    Basic density field configuration:
+
+    >>> density = DensityFieldConfig(
+    ...     bins=(50, 50),
+    ...     cmap="plasma",
+    ... )
+
+    Density field showing raw counts instead of probabilities:
+
+    >>> density = DensityFieldConfig(
+    ...     bins=(80, 80),
+    ...     normalize=False,
+    ...     cmap="magma",
+    ... )
+
+    Typical integration into a psychrometric chart:
+
+    >>> chart = PsychChart(
+    ...     cfg=cfg,
+    ...     density_field=density,
+    ... )
+    >>> chart.draw()
+    """
+
+    # ------------------------------------------------------------------
+    # Histogram resolution in thermodynamic space
+    # ------------------------------------------------------------------
+    bins: Tuple[int, int] = (60, 60)
+
+    # ------------------------------------------------------------------
+    # Rendering options
+    # ------------------------------------------------------------------
+    cmap: str = "viridis"
+    vmin: Optional[float] = None
+    vmax: Optional[float] = None
+    alpha: float = 0.6
+    colorbar: bool = True
+
+    # ------------------------------------------------------------------
+    # Normalization behavior
+    # ------------------------------------------------------------------
+    normalize: bool = True
+
+
+# =============================================================================
+# Path configuration
+# =============================================================================
+@dataclass
+class PathConfig:
+    """
+    Declarative definition of a psychrometric path (trajectory).
+
+    A ``PathConfig`` represents an **ordered trajectory** in the
+    psychrometric chart, typically derived from time-series
+    observations (e.g., hourly climate data, process evolution,
+    animal/environment interaction).
+
+    The path is defined in thermodynamic space using:
+    - dry-bulb temperature (T)
+    - relative humidity (RH)
+
+    and is rendered as a **connected polyline** following the
+    temporal or logical order of the data.
+
+    This class is purely declarative.
+    It does NOT:
+    - compute psychrometric properties (W, h, v, etc.)
+    - perform temporal validation or sorting
+    - interpolate or resample data
+    - perform plotting or rendering
+    - enforce physical bounds
+
+    All interpretation and rendering logic must be handled by
+    higher-level components (e.g., ``PsychChart``).
+
+    Parameters
+    ----------
+    label : str
+        Label associated with the path.
+        Used in legends and annotations.
+    T : sequence of float
+        Ordered sequence of dry-bulb air temperatures (°C).
+        The order defines the trajectory direction.
+    RH : sequence of float
+        Ordered sequence of relative humidity values (fraction, 0–1).
+        Must have the same length as ``T``.
+    color : str, optional
+        Single color used to draw the path.
+        Mutually exclusive with ``cmap``.
+    cmap : str, optional
+        Matplotlib colormap name used to color the path
+        progressively along its length (e.g., by time index).
+    linewidth : float, optional
+        Width of the path line (default: 1.5).
+    linestyle : str, optional
+        Matplotlib line style (default: "-").
+    alpha : float, optional
+        Transparency level of the path (0 = fully transparent,
+        1 = fully opaque).
+
+    Notes
+    -----
+    - Either ``color`` or ``cmap`` may be provided.
+      If both are specified, rendering logic should define
+      precedence explicitly.
+    - No validation is performed on array lengths or values.
+      Structural checks should be handled by the caller.
+    - The path is assumed to be ordered correctly prior to
+      construction of this object.
+
+    Design considerations
+    ---------------------
+    - This class mirrors the philosophy of ``ObservationsConfig``:
+      *declarative first, logic elsewhere*.
+    - Keeping paths separate from points avoids semantic overload
+      and enables richer visual storytelling (trajectories, cycles).
+    - The same path definition can be reused across multiple charts.
+
+    Examples
+    --------
+    Basic trajectory from time-series observations:
+
+    >>> path = PathConfig(
+    ...     label="Daily cycle",
+    ...     T=[22.1, 23.4, 25.0, 27.2, 26.1, 24.0],
+    ...     RH=[0.80, 0.75, 0.65, 0.55, 0.60, 0.70],
+    ...     color="tab:blue",
+    ... )
+
+    Trajectory with colormap encoding progression:
+
+    >>> path = PathConfig(
+    ...     label="Process evolution",
+    ...     T=T_series,
+    ...     RH=RH_series,
+    ...     cmap="viridis",
+    ...     linewidth=2.0,
+    ...     alpha=0.8,
+    ... )
+
+    Typical integration into a psychrometric chart:
+
+    >>> chart = PsychChart(
+    ...     cfg=cfg,
+    ...     paths=[path],
+    ... )
+    >>> chart.draw()
+    """
+    # ------------------------------------------------------------------
+    # Semantic label
+    # ------------------------------------------------------------------
+    label: str
+
+    # ------------------------------------------------------------------
+    # Ordered thermodynamic states
+    # ------------------------------------------------------------------
+    T: Sequence[float]          # dry-bulb temperature (°C)
+    RH: Sequence[float]         # relative humidity (fraction, 0–1)
+
+    # ------------------------------------------------------------------
+    # Visual attributes
+    # ------------------------------------------------------------------
+    values: Optional[Sequence[float]] = None    
+    color: Optional[str] = None
+    cmap: Optional[str] = None
+    vmin: Optional[float] = None
+    vmax: Optional[float] = None
+
+    linewidth: float = 1.5
+    linestyle: str = "-"
+
+    alpha: float = 1.0
 

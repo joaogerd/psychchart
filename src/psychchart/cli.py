@@ -56,20 +56,10 @@ def main() -> None:
         # -------------------------------------------------------------
         data = load_chart_config(args.config)
 
-        cfg      = data["cfg"]
-        isolines = data["isolines"]
-        zones    = data["zones"]
-        points   = data["points"]
-
         # -------------------------------------------------------------
         # Create and draw chart
         # -------------------------------------------------------------
-        chart = PsychChart(
-            cfg=cfg,
-            isolines=isolines,
-            zones=zones,
-            points=points
-        )
+        chart = PsychChart(**data)
 
         ax = chart.draw()
 
