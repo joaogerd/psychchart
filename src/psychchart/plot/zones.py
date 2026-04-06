@@ -4,6 +4,7 @@ from typing import Tuple
 from psychchart.psychrometrics import Psychrometrics
 from psychchart.config import Zone
 from .layers import ZORDER
+from .utils import clip_to_saturation
 
 
 # =============================================================================
@@ -464,24 +465,39 @@ def draw_zones(ax, chart) -> None:
         # ----------------------------------------------------------
         # Draw zone boundary
         # ----------------------------------------------------------
-        ax.plot(
+        (line,) = ax.plot(
             t_poly,
             w_poly,
             lw=z.linewidth,
             color=z.edgecolor,
             label=z.name,
-            zorder=ZORDER['zone_edge'],
+            zorder=ZORDER["zone_edge"],
         )
-
+        
+        # Clip line to saturation
+        clip_to_saturation(
+            ax,
+            line,
+            chart.T,
+            chart.W_sat,
+        )
+        
         # ----------------------------------------------------------
         # Fill zone interior (optional)
         # ----------------------------------------------------------
         if z.facecolor and z.facecolor.lower() != "none":
-            ax.fill(
+            patch = ax.fill(
                 t_poly,
                 w_poly,
                 facecolor=z.facecolor,
                 alpha=0.20,
-                zorder=ZORDER['zone_fill'],
+                zorder=ZORDER["zone_fill"],
+            )[0]
+        
+            clip_to_saturation(
+                ax,
+                patch,
+                chart.T,
+                chart.W_sat,
             )
 

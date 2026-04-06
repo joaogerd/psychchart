@@ -1,409 +1,79 @@
 """
 Index rendering utilities for psychrometric charts.
 
-This module provides **low-level helpers** to compute and render
-bioclimatic and thermal indexes (e.g., ITU, HLI) over a
-psychrometric (T, RH) domain.
+Pure rendering layer.
 
-Design philosophy
------------------
-- Index computation is *fully decoupled* from plotting logic.
-- All index evaluation happens in (T, RH) space.
-- This module does NOT validate configurations.
-- This module does NOT manage plotting order.
-- The PsychChart object acts only as a *context provider*.
+Responsibilities:
+- Receive precomputed index layers (via render/)
+- Draw them using matplotlib
 
-Typical responsibilities handled here:
-- resolve index identifiers to callables
-- build computational grids
-- draw isolines, zones and continuous fields
-
-All orchestration must be done by the caller.
+Non-responsibilities:
+- No index computation
+- No grid building
+- No psychrometric transformations
 """
+
 from __future__ import annotations
-
 import numpy as np
+from matplotlib.pyplot import get_cmap
 from matplotlib.axes import Axes
-from matplotlib.path import Path
 from matplotlib.patches import PathPatch
-from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib.colors import ListedColormap, BoundaryNorm, Normalize
 
-from psychchart.indexes.engine import evaluate_index
-from psychchart.config import IndexConfig, IndexZone, IndexField
-from psychchart.psychrometrics import Psychrometrics
+from psychchart.render.build_index_field import build_index_field
 from psychchart.plot.index_profiles import get_index_profile
+from psychchart.indexes.registry import INDEX_REGISTRY
+from psychchart.indexes.base import BaseIndex
 from .layers import ZORDER
 
 
-def _clip_to_saturation(ax, artist, T, W_sat):
+# =============================================================================
+# Helpers
+# =============================================================================
+def _resolve_index(index) -> type[BaseIndex]:
     """
-    Clip a Matplotlib artist to the saturation curve (100% relative humidity).
-
-    This helper function restricts the visible region of a Matplotlib
-    artist (e.g., a heatmap, contour field, or filled zone) to the
-    **physically admissible region** of the psychrometric chart,
-    i.e. the area *below* the saturation curve (RH = 100%).
-
-    From a physical standpoint, any state above the saturation curve
-    represents supersaturation and is therefore not meaningful for
-    standard psychrometric analysis.
-
-    From a visualization standpoint, clipping:
-    - prevents misleading colors or contours above saturation,
-    - reinforces the physical interpretation of the chart,
-    - improves visual clarity and scientific correctness.
-
-    Parameters
-    ----------
-    ax : matplotlib.axes.Axes
-        Axes to which the artist belongs. Used to ensure that
-        clipping is applied in data coordinates.
-    artist : matplotlib artist
-        Any Matplotlib artist supporting ``set_clip_path``,
-        such as:
-        - QuadMesh (from ``pcolormesh``)
-        - ContourSet (from ``contourf``)
-        - PolyCollection
-    T : numpy.ndarray
-        One-dimensional array of dry-bulb temperature values (°C).
-        This array must match the domain used to construct ``W_sat``.
-    W_sat : numpy.ndarray
-        One-dimensional array of saturation humidity ratio values
-        (kg/kg) corresponding to ``T``.
-
-    Notes
-    -----
-    - The clipping polygon is constructed in data coordinates.
-    - The region kept visible is:
-        * above the x-axis (W >= 0)
-        * below the saturation curve
-    - The saturation curve itself is **not modified** by this function.
-    - This function does not check array consistency; validation must
-      be handled by the caller.
-
-    Design considerations
-    ---------------------
-    - The polygon is explicitly closed to ensure correct clipping.
-    - The lower boundary is defined as W = 0 (chart baseline).
-    - This function is intentionally low-level and imperative.
-    - It is private (prefixed with ``_``) to allow future refactoring
-      without breaking the public API.
-
-    Examples
-    --------
-    Clipping a continuous index field (pcolormesh):
-
-    >>> cs = ax.pcolormesh(TT, RR, Z, cmap="inferno")
-    >>> _clip_to_saturation(ax, cs, chart.T, chart.W_sat)
-
-    Clipping a filled contour set:
-
-    >>> cs = ax.contourf(TT, RR, Z, levels=20)
-    >>> for coll in cs.collections:
-    ...     _clip_to_saturation(ax, coll, chart.T, chart.W_sat)
-
-    Typical usage pattern inside PsychChart:
-
-    >>> cs = ax.contourf(...)
-    >>> _clip_to_saturation(self.ax, cs, self.T, self.W_sat)
+    Resolve index from string or class.
     """
+    if isinstance(index, str):
+        if index not in INDEX_REGISTRY:
+            raise ValueError(f"Unknown index '{index}'")
+        return INDEX_REGISTRY[index]
 
-    # ------------------------------------------------------------------
-    # Build clipping polygon
-    # ------------------------------------------------------------------
-    # The polygon follows:
-    #   1) the saturation curve from left to right
-    #   2) the chart baseline (W = 0) from right to left
-    #
-    # This defines the physically valid region of the chart.
-    verts = np.column_stack([
-        np.concatenate([T, T[::-1]]),                     # x-coordinates
-        np.concatenate([W_sat, np.zeros_like(W_sat)]),    # y-coordinates
-    ])
+    if isinstance(index, type) and issubclass(index, BaseIndex):
+        return index
 
-    # ------------------------------------------------------------------
-    # Path codes
-    # ------------------------------------------------------------------
-    # MOVETO : start at first saturation point
-    # LINETO : follow saturation curve
-    # LINETO : return along baseline
-    codes = np.concatenate([
-        [Path.MOVETO],
-        np.full(len(T) - 1, Path.LINETO),
-        np.full(len(T), Path.LINETO),
-    ])
+    raise TypeError(f"Invalid index type: {index}")
 
-    # ------------------------------------------------------------------
-    # Create clipping path and patch
-    # ------------------------------------------------------------------
-    path = Path(verts, codes)
 
-    # The transform ensures clipping occurs in data coordinates
-    patch = PathPatch(path, transform=ax.transData)
-
-    # ------------------------------------------------------------------
-    # Apply clipping to the artist
-    # ------------------------------------------------------------------
-    artist.set_clip_path(patch)
-    
-def _compute_psychrometric_index_field(
-    chart,
-    index: str,
-    *,
-    params: dict | None = None,
-    n: int = 300,
-):    
+def _get_index_layer(chart, index):
     """
-    Compute a bioclimatic index field over the psychrometric domain (T, W).
-
-    This function evaluates a bioclimatic or thermal index over a
-    **physically consistent psychrometric grid**, defined in terms of:
-
-    - dry-bulb temperature (T)
-    - humidity ratio (W)
-
-    The index itself is evaluated in (T, RH) space, but the grid is
-    constructed in (T, W) space to ensure that:
-    - supersaturated states are naturally excluded,
-    - clipping against saturation is geometrically well-defined,
-    - the resulting field can be plotted directly in psychrometric
-      coordinates.
-
-    The conversion from humidity ratio (W) to relative humidity (RH)
-    is performed using the exact psychrometric relationship.
-
-    Parameters
-    ----------
-    chart : PsychChart
-        Chart context providing:
-        - temperature limits (cfg.t_min, cfg.t_max)
-        - atmospheric pressure (cfg.pressure)
-        - auxiliary variables required by some indexes
-    index : str
-        Identifier of the index to be computed (e.g., ``"ITU"``, ``"HLI"``).
-    n : int, optional
-        Resolution of the computational grid in each dimension.
-        Default is 300, resulting in an n × n grid.
+    Resolve index and safely build its scalar field layer.
 
     Returns
     -------
-    TT : numpy.ndarray
-        2D array of dry-bulb temperature values (°C).
-    WW : numpy.ndarray
-        2D array of humidity ratio values (kg/kg).
-    Z : numpy.ndarray
-        2D array of computed index values.
-
-    Notes
-    -----
-    - The humidity ratio grid spans from W = 0 up to the **maximum
-      saturation value** within the temperature domain.
-    - Relative humidity is clipped to [0, 1] after conversion to
-      prevent numerical artefacts near saturation.
-    - No visualization, masking, or clipping is performed here.
-      This function is purely computational.
-
-    Design considerations
-    ---------------------
-    - The psychrometric grid is defined in (T, W), not (T, RH),
-      to preserve physical meaning and simplify saturation handling.
-    - Index computation remains agnostic of plotting concerns.
-    - This function is intentionally private and imperative.
-
-    Examples
-    --------
-    Typical internal usage when rendering an index field:
-
-    >>> TT, WW, Z = _compute_psychrometric_index_field(
-    ...     chart,
-    ...     index="ITU",
-    ...     n=200,
-    ... )
-
-    The returned arrays can be passed directly to ``contourf`` or
-    ``pcolormesh``:
-
-    >>> ax.contourf(TT, WW, Z, levels=20)
+    (index_cls, layer) or (index_cls, None)
     """
-    if params is None:
-        params = {}
-        
-    # ------------------------------------------------------------------
-    # 1. Dry-bulb temperature domain (°C)
-    # ------------------------------------------------------------------
-    # This defines the horizontal axis of the psychrometric chart.
-    T = np.linspace(chart.cfg.t_min, chart.cfg.t_max, n)
+    if not hasattr(chart, "_index_cache"):
+        chart._index_cache = {}
 
-    # ------------------------------------------------------------------
-    # 2. Saturation humidity ratio along T
-    # ------------------------------------------------------------------
-    # W_sat(T) defines the physical upper boundary (RH = 100%).
-    W_sat = Psychrometrics.humidity_ratio(
-        T,
-        1.0,
-        chart.cfg.pressure,
-    )
+    if index in chart._index_cache:
+        return _resolve_index(index), chart._index_cache[index]
 
-    # ------------------------------------------------------------------
-    # 3. Humidity ratio domain (kg/kg)
-    # ------------------------------------------------------------------
-    # The vertical axis spans from completely dry air (W = 0)
-    # up to the maximum saturation value within the domain.
-    W = np.linspace(0.0, W_sat.max(), n)
+    index_cls = _resolve_index(index)
 
-    # ------------------------------------------------------------------
-    # 4. Build full psychrometric grid (T, W)
-    # ------------------------------------------------------------------
-    TT, WW = np.meshgrid(T, W)
+    try:
+        layer = build_index_field(index_cls, chart.cfg, chart.psych)
+    except ValueError:
+        return index_cls, None
 
-    # ------------------------------------------------------------------
-    # 5. Physically consistent conversion: W → RH
-    # ------------------------------------------------------------------
-    # Relative humidity is derived from humidity ratio using the
-    # exact psychrometric relationship.
-    #
-    # This step is CRITICAL:
-    # - Indexes are defined in terms of RH, not W.
-    # - Naive interpolation in RH space would be incorrect.
-    RH = Psychrometrics.relative_humidity_from_W(
-        TT,
-        WW,
-        chart.cfg.pressure,
-    )
+    chart._index_cache[index] = layer
 
-    # ------------------------------------------------------------------
-    # 6. Physical masking / clipping
-    # ------------------------------------------------------------------
-    # Numerical artefacts may produce values slightly outside
-    # the physical range near saturation.
-    RH = np.clip(RH, 0.0, 1.0)
-
-    # ------------------------------------------------------------------
-    # 8. Compute index field
-    # ------------------------------------------------------------------
-    Z = evaluate_index(
-        index,
-        TT,
-        RH,
-        params=params
-    )
-
-    return TT, WW, Z
-
-
-# =============================================================================
-# Index isolines
-# =============================================================================
-def _draw_index_isolines(chart, ax: Axes, config: IndexConfig):
-    """
-    Draw contour lines (isolines) of a bioclimatic index.
-
-    This helper evaluates the index on a regular grid and draws
-    isolines corresponding to the levels defined in ``IndexConfig``.
-
-    Parameters
-    ----------
-    chart : PsychChart
-        Chart context.
-    ax : matplotlib.axes.Axes
-        Axes where isolines will be drawn.
-    config : IndexConfig
-        Index configuration (levels, style, color).
-
-    Notes
-    -----
-    - Contours are drawn in (T, RH) space.
-    - Labels are rendered directly on the isolines.
-    """
-
-    TT, WW, Z = _compute_psychrometric_index_field(
-        chart,
-        config.index,
-        params=config.parameters,
-    )
-
-    # Draw isolines
-    cs = ax.contour(
-        TT,
-        WW,
-        Z,
-        levels=config.levels,
-        linestyles=config.style,
-        colors=config.color,
-        zorder=ZORDER['isolines'],
-    )
-
-    # Inline labels for clarity
-    ax.clabel(
-        cs,
-        fmt=lambda v: f"{config.name} = {v:.0f}",
-        fontsize=8,
-    )
-
-
-# =============================================================================
-# Index-based zones (categorical regions)
-# =============================================================================
-def _draw_index_zone(chart, ax: Axes, zone: IndexZone):
-    """
-    Render a filled zone corresponding to a numeric index range.
-
-    This helper highlights regions where an index lies within
-    a given interval (e.g., thermal stress classes).
-
-    Parameters
-    ----------
-    chart : PsychChart
-        Chart context.
-    ax : matplotlib.axes.Axes
-        Target axes.
-    zone : IndexZone
-        Index zone definition:
-        - index name
-        - numeric range
-        - visual attributes
-
-    Notes
-    -----
-    - Implemented using ``contourf`` with two levels.
-    - Text labels are stacked vertically in axes coordinates.
-    """
-
-    TT, WW, Z = _compute_psychrometric_index_field(
-        chart,
-        zone.index,
-        params=zone.parameters,
-    )
-
-    # Filled region
-    ax.contourf(
-        TT,
-        WW,
-        Z,
-        levels=[zone.range[0], zone.range[1]],
-        colors=[zone.color],
-        alpha=zone.alpha,
-        zorder=ZORDER['index_zone'],
-    )
-
-    # Stacked textual label
-    ax.text(
-        0.01,
-        0.99 - 0.05 * chart._index_zone_counter,
-        f"{zone.index}: {zone.name}",
-        transform=ax.transAxes,
-        fontsize=9,
-        verticalalignment="top",
-        zorder=ZORDER["zone_edge"],
-    )
-
-    chart._index_zone_counter += 1
-
-
+    return index_cls, layer
 # =============================================================================
 # Continuous index fields (heatmaps)
 # =============================================================================
-def _draw_index_field(chart, ax: Axes, field: IndexField):
+
+def _draw_index_field(chart, ax: Axes, layer, cfg: IndexConfig):
     """
     Render a continuous psychrometric index field as a background layer.
 
@@ -458,31 +128,31 @@ def _draw_index_field(chart, ax: Axes, field: IndexField):
       disabled in the associated ``IndexProfile``.
     - This function is intentionally private and imperative.
     """
+    # ------------------------------------------------------------------
+    # 1. Get index field in psychrometric space (T, W)
+    # ------------------------------------------------------------------
+    # layer.X : 2D dry-bulb temperature grid (°C)
+    # layer.Y : 2D humidity ratio grid (kg/kg)
+    # layer.Z : computed index values
+#    _, layer = _get_index_layer(chart, cfg.index)
 
     # ------------------------------------------------------------------
-    # 1. Compute index field in psychrometric space (T, W)
+    # 2. Resolve rendering config and semantic profile
     # ------------------------------------------------------------------
-    # TT : 2D dry-bulb temperature grid (°C)
-    # WW : 2D humidity ratio grid (kg/kg)
-    # Z  : computed index values
-    TT, WW, Z = _compute_psychrometric_index_field(
-        chart,
-        field.index,
-        params=field.parameters,
+    profile = get_index_profile(cfg.index)
+    field_cfg = (
+        cfg.render.field
+        if cfg.render is not None and cfg.render.field is not None
+        else FieldRenderConfig()
     )
 
-    # ------------------------------------------------------------------
-    # 2. Resolve canonical semantic profile (if available)
-    # ------------------------------------------------------------------
-    profile = get_index_profile(field.index)
-
-    # Priority order for classification levels:
-    #   1) explicit levels from IndexField
+    # Priority for field classification levels:
+    #   1) canonical levels from IndexConfig
     #   2) canonical levels from IndexProfile
     #   3) None (continuous rendering)
-    levels = field.levels or (profile.levels if profile else None)
+    levels = cfg.levels or (profile.levels if profile else None)
 
-    # Colors come only from the semantic profile
+    # Semantic colors are taken only from the profile
     colors = profile.colors if profile else None
 
     # ------------------------------------------------------------------
@@ -491,98 +161,225 @@ def _draw_index_field(chart, ax: Axes, field: IndexField):
     cmap = None
     norm = None
 
-    # Discrete classified field (semantic)
-    if levels and colors:
-        cmap = ListedColormap(colors)
-        norm = BoundaryNorm(levels, cmap.N)
-
-    # Continuous field with user-defined colormap
-    elif field.cmap:
-        cmap = field.cmap
+    # User-declared cmap has priority over semantic profile colors
+    if levels:
+        if cfg.cmap:
+            cmap = cfg.cmap
+            # For classified rendering with explicit levels, keep discrete bins
+            norm = BoundaryNorm(levels, get_cmap(cmap).N if isinstance(cmap, str) else cmap.N)
+        elif colors:
+            cmap = ListedColormap(colors)
+            norm = BoundaryNorm(levels, cmap.N)
+    elif cfg.cmap:
+        cmap = cfg.cmap
+    # Optional explicit normalization bounds for continuous rendering
+    if norm is None and (cfg.vmin is not None or cfg.vmax is not None):
+        norm = Normalize(vmin=cfg.vmin, vmax=cfg.vmax)
 
     # ------------------------------------------------------------------
     # 4. Render the index field
     # ------------------------------------------------------------------
     if levels:
         # Discrete filled contours (classified visualization)
-        cs = ax.contourf(
-            TT,
-            WW,
-            Z,
+        artist = ax.contourf(
+            layer.X,
+            layer.Y,
+            layer.Z,
             levels=levels,
             cmap=cmap,
             norm=norm,
-            alpha=field.alpha,
+            alpha=field_cfg.alpha,
             zorder=ZORDER["index_field"],
             extend="max",
         )
-        artist = cs
     else:
         # Continuous heatmap
         artist = ax.pcolormesh(
-            TT,
-            WW,
-            Z,
+            layer.X,
+            layer.Y,
+            layer.Z,
             shading="auto",
             cmap=cmap,
-            alpha=field.alpha,
+            norm=norm,
+            alpha=field_cfg.alpha,
             zorder=ZORDER["index_field"],
         )
 
     # ------------------------------------------------------------------
-    # 5. Clip field to the saturation curve (RH = 100 %)
+    # 5. Optional colorbar with semantic labels
     # ------------------------------------------------------------------
-    # Unless explicitly disabled by the profile, index fields
-    # should never appear above the physical saturation limit.
-    if profile is None or profile.clip_to_saturation:
-        # Build 1D saturation curve
-        T_1d = np.linspace(
-            chart.cfg.t_min,
-            chart.cfg.t_max,
-            TT.shape[1],
-        )
-        W_sat = Psychrometrics.humidity_ratio(
-            T_1d, 1.0, chart.cfg.pressure
-        )
-
-        _clip_to_saturation(ax, artist, T_1d, W_sat)
-
-    # ------------------------------------------------------------------
-    # 6. Optional colorbar with semantic labels
-    # ------------------------------------------------------------------
-    if field.colorbar:
+    if field_cfg.colorbar:
         cbar = chart.fig.colorbar(artist, ax=ax)
-
-        # If semantic labels are available, use class midpoints
+    
         if profile and profile.labels and levels:
-            mids = [
-                0.5 * (levels[i] + levels[i + 1])
-                for i in range(len(levels) - 1)
-            ]
-            cbar.set_ticks(mids)
-            cbar.set_ticklabels(profile.labels)
+            n_intervals = len(levels) - 1
+            n_labels = len(profile.labels)
+    
+            if n_labels == n_intervals:
+                mids = [
+                    0.5 * (levels[i] + levels[i + 1])
+                    for i in range(n_intervals)
+                ]
+                cbar.set_ticks(mids)
+                cbar.set_ticklabels(profile.labels)
+    
+        cbar.set_label(cfg.label or cfg.index)
+# =============================================================================
+# Index isolines
+# =============================================================================
 
-        cbar.set_label(field.index)
+def _draw_index_isolines(chart, ax: Axes, layer, cfg: IndexConfig) -> None:
+    """
+    Draw contour lines (isolines) of a psychrometric/bioclimatic index.
+
+    This helper evaluates the index on the psychrometric grid and renders
+    contour lines at the configured levels.
+
+    Parameters
+    ----------
+    chart : PsychChart
+        Chart context.
+    ax : matplotlib.axes.Axes
+        Axes where isolines will be drawn.
+    cfg : IndexConfig
+        Index configuration for isoline rendering.
+
+    Notes
+    -----
+    - Contours are drawn in psychrometric space using the grid produced
+      by the index layer.
+    - Labels, when enabled, are rendered directly on the contour lines.
+    """
+
+    # ------------------------------------------------------------------
+    # 1. Get index field in psychrometric space
+    # ------------------------------------------------------------------
+    #_, layer = _get_index_layer(chart, cfg.index)
+
+    # ------------------------------------------------------------------
+    # 2. Resolve semantic profile and isoline render config
+    # ------------------------------------------------------------------
+    profile = get_index_profile(cfg.index)
+    iso_cfg = (
+        cfg.render.isolines
+        if cfg.render is not None and cfg.render.isolines is not None
+        else IsolineRenderConfig()
+    )
+
+    # Priority for isoline levels:
+    #   1) explicit isoline levels
+    #   2) canonical index levels
+    #   3) canonical semantic levels from profile
+    #   4) no rendering if none exist
+    levels = (
+        iso_cfg.levels
+        or cfg.levels
+        or (profile.levels if profile else None)
+    )
+
+    if not levels:
+        return
+
+    # ------------------------------------------------------------------
+    # 3. Resolve line color
+    # ------------------------------------------------------------------
+    # Isolines use their own rendering color, independent of semantic
+    # fill colors used by the field layer.
+    line_color = iso_cfg.color or "black"
+
+    # ------------------------------------------------------------------
+    # 4. Draw contour lines
+    # ------------------------------------------------------------------
+    cs = ax.contour(
+        layer.X,
+        layer.Y,
+        layer.Z,
+        levels=levels,
+        linestyles=iso_cfg.style,
+        linewidths=iso_cfg.linewidth,
+        colors=line_color,
+        alpha=iso_cfg.alpha,
+        zorder=ZORDER["isolines"],
+    )
+
+    # ------------------------------------------------------------------
+    # 5. Draw inline labels
+    # ------------------------------------------------------------------
+    if iso_cfg.label:
+        template = iso_cfg.label_fmt or "{index} = {value:.0f}"
+
+        ax.clabel(
+            cs,
+            fmt=lambda v: template.format(index=cfg.index, value=v),
+            fontsize=iso_cfg.label_fontsize or 8,
+        )
+
+# =============================================================================
+# Index zones
+# =============================================================================
+def _draw_index_zone(chart, ax: Axes, zone):
+    index_cls = _resolve_index(zone.index)
+
+    try:
+        layer = build_index_field(index_cls, chart.cfg, chart.psych)
+    except ValueError:
+        return
+
+    if not hasattr(zone, "range") or len(zone.range) != 2:
+        raise ValueError(f"Invalid zone range for index '{zone.index}'")
+
+    mask = (layer.Z >= zone.range[0]) & (layer.Z <= zone.range[1])
+
+    ax.contourf(
+        layer.X,
+        layer.Y,
+        mask,
+        levels=[0.5, 1],
+        colors=[zone.color],
+        alpha=zone.alpha,
+        zorder=ZORDER["index_zone"],
+    )
+
+    # Safe counter
+    if not hasattr(chart, "_index_zone_counter"):
+        chart._index_zone_counter = 0
+
+    ax.text(
+        0.01,
+        0.99 - 0.05 * chart._index_zone_counter,
+        f"{zone.index}: {zone.name}",
+        transform=ax.transAxes,
+        fontsize=9,
+        verticalalignment="top",
+        zorder=ZORDER["zone_edge"],
+    )
+
+    chart._index_zone_counter += 1
 
 
 # =============================================================================
-# Public dispatchers (called by PsychChart)
+# Public dispatchers
 # =============================================================================
-def draw_index_isolines(ax: Axes, chart) -> None:
-    """Draw all index isolines configured in the chart."""
-    for idx in chart.indexes:
-        if idx.mode == "isolines":
-            _draw_index_isolines(chart, ax, idx)
+def draw_indexes(chart, ax):
+    for cfg in chart.indexes:
+        index_cls, layer = _get_index_layer(chart, cfg.index)
+
+        if layer is None:
+            continue
+
+        # FIELD
+        if cfg.render and cfg.render.field:
+            _draw_index_field(chart, ax, layer, cfg)
+
+        # ISOLINES
+        if cfg.render and cfg.render.isolines:
+            _draw_index_isolines(chart, ax, layer, cfg)
 
 
-def draw_index_zones(ax: Axes, chart) -> None:
-    """Draw all index-based zones."""
+
+def draw_index_zones(chart, ax: Axes) -> None:
+    if not getattr(chart, "index_zones", None):
+        return
+
     for zone in chart.index_zones:
         _draw_index_zone(chart, ax, zone)
-
-
-def draw_index_fields(ax: Axes, chart) -> None:
-    """Draw all continuous index fields."""
-    for field in chart.index_fields:
-        _draw_index_field(chart, ax, field)
-

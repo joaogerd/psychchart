@@ -66,9 +66,6 @@ isos:
 index_fields:
   - index: ITU
 
-    # Canonical ITU stress thresholds
-    levels: [72, 78, 84, 90]
-
     # Carefully chosen palette (literature-like)
     cmap: Spectral_r
 
@@ -83,13 +80,13 @@ index_fields:
 # -----------------------------------------------------------------------------
 # ITU isolines (over the field)
 # -----------------------------------------------------------------------------
-indexes:
-  - name: ITU
-    mode: isolines
-    levels: [72, 78, 84]
-    style: "-"
-    color: black
-    linewidth: 1.2
+#indexes:
+#  - name: ITU
+#    mode: isolines
+#    levels: [72, 78, 84]
+#    style: "-"
+#    color: black
+#    linewidth: 1.2
 
 
 # -----------------------------------------------------------------------------

@@ -23,6 +23,7 @@ from typing import Optional
 
 from .base import IndexProfile
 from .itu import ITU_PROFILE
+from .thermal_excess import TE_PROFILE
 
 
 # =============================================================================
@@ -38,6 +39,7 @@ from .itu import ITU_PROFILE
 # Values are immutable IndexProfile instances.
 _INDEX_PROFILES = {
     "ITU": ITU_PROFILE,
+    "TE": TE_PROFILE,
 }
 
 
