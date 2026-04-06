@@ -1,0 +1,62 @@
+chart:
+  t_min: 0
+  t_max: 50
+  pressure: 101325
+  show_tw_grid: True
+    #  tw_grid:
+    #    vertical: False
+    #    horizontal: False
+    #    every:
+    #      T: 5
+    #      W: 0.002
+    #  tw_grid_style:
+    #    color: green
+    #    linewidth: 1.4
+    #    linestyle: "-"
+    #    alpha: 1.0
+
+  title: Psychrometric Chart with THI
+  output: chart.png
+
+isolines:
+  relative_humidity:
+    enabled: True
+    color: "blue"
+    labels: True
+  enthalpy:
+    enabled: True
+    color: "red"
+    labels: True
+
+indexes:
+  - name: ITU
+    label: Temperature–Humidity Index
+    mode: isolines
+    levels: [60, 65, 70, 75, 80]
+    style: ":"
+    color: black
+    parameters:
+      animal: dairy_cow
+
+        #index_zones:
+        #  - index: ITU
+        #    name: Comfort
+        #    range: [0, 72]
+        #    color: green
+        #    alpha: 0.25
+        #
+        #  - index: ITU
+        #    name: Heat stress
+        #    range: [72, 80]
+        #    color: orange
+        #    alpha: 0.3
+
+      #index_fields:
+      #  - index: ITU
+      #    cmap: inferno
+      #    vmin: 60
+      #    vmax: 90
+      #    alpha: 0.5
+      #    parameters:
+      #      animal: dairy_cow
+
