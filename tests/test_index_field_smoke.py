@@ -50,21 +50,26 @@ def test_index_field_smoke(tmp_path):
     # Minimal YAML configuration including an index field definition
     # --------------------------------------------------------------
     yaml = """
+profile: default_si
+
 chart:
   t_min: 20
   t_max: 40
 
-index_fields:
+indexes:
   - index: ITU
-    cmap: inferno
+    label: ITU
+    render:
+      field:
+        alpha: 0.8
+        colorbar: false
 """
-
     # --------------------------------------------------------------
     # Write YAML configuration to a temporary file
     # --------------------------------------------------------------
     cfg = tmp_path / "cfg.yaml"
-    cfg.write_text(yaml)
-
+    cfg.write_text(yaml, encoding="utf-8")
+    
     # --------------------------------------------------------------
     # Load configuration into Python objects
     # --------------------------------------------------------------

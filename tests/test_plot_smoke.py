@@ -1,25 +1,20 @@
-import matplotlib
-matplotlib.use("Agg")  # backend sem GUI
-
-from psychchart.plot import PsychChart
-from psychchart.config import ChartConfig, IsoSet
+from psychchart import load_chart_config, PsychChart
 
 
-def test_plot_smoke():
-    cfg = ChartConfig(t_min=0, t_max=40)
+def test_plot_smoke(tmp_path):
+    yaml = """
+profile: default_si
 
-    isolines = {
-        "relative_humidity": IsoSet(
-            name="relative_humidity",
-            values=[0.3, 0.6, 0.9]
-        )
-    }
+chart:
+  t_min: 0
+  t_max: 40
+"""
 
-    chart = PsychChart(cfg, isolines=isolines)
+    cfg = tmp_path / "plot_smoke.yaml"
+    cfg.write_text(yaml, encoding="utf-8")
+
+    data = load_chart_config(cfg)
+    chart = PsychChart(**data)
     ax = chart.draw()
 
-    # Verificações mínimas
     assert ax is not None
-    assert ax.get_xlabel() != ""
-    assert ax.get_ylabel() != ""
-

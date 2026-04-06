@@ -32,8 +32,8 @@ def test_hli_increases_with_temperature():
     increased thermal load on the animal.
     """
     # Reference conditions
-    v1 = HLI.compute(T=25.0, RH=0.5, SR=600.0, WS=2.0)
-    v2 = HLI.compute(T=35.0, RH=0.5, SR=600.0, WS=2.0)
+    v1 = HLI.compute({"T": 25.0, "RH": 0.5, "wind": 2.0})
+    v2 = HLI.compute({"T": 35.0, "RH": 0.5, "wind": 2.0})
 
     # Higher temperature must yield higher HLI
     assert v2 > v1
@@ -48,10 +48,10 @@ def test_hli_decreases_with_wind():
     increasing wind speed must reduce the HLI value.
     """
     # Low wind speed
-    v1 = HLI.compute(T=35.0, RH=0.6, SR=700.0, WS=1.0)
+    v1 = HLI.compute({"T": 35.0, "RH": 0.6, "wind": 1.0})
 
     # High wind speed
-    v2 = HLI.compute(T=35.0, RH=0.6, SR=700.0, WS=4.0)
+    v2 = HLI.compute({"T": 35.0, "RH": 0.6, "wind": 4.0})
 
     # Stronger wind must reduce HLI
     assert v2 < v1
@@ -66,11 +66,19 @@ def test_hli_increases_with_radiation():
     incoming radiation must result in a higher HLI.
     """
     # Lower solar radiation
-    v1 = HLI.compute(T=30.0, RH=0.5, SR=300.0, WS=2.0)
+    v1 = HLI.compute({"T": 30.0, "RH": 0.5, "SR": 300.0, "wind": 2.0})
 
     # Higher solar radiation
-    v2 = HLI.compute(T=30.0, RH=0.5, SR=800.0, WS=2.0)
+    v2 = HLI.compute({"T": 30.0, "RH": 0.5, "SR": 800.0, "wind": 2.0})
 
     # Higher radiation must increase HLI
     assert v2 > v1
 
+def test_hli_increases_with_black_globe_temperature():
+    """
+    HLI must increase with BG when RH and wind are fixed.
+    """
+    v1 = HLI.compute({"BG": 28.0, "RH": 0.5, "wind": 2.0})
+    v2 = HLI.compute({"BG": 35.0, "RH": 0.5, "wind": 2.0})
+
+    assert v2 > v1

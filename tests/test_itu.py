@@ -16,8 +16,9 @@ The tests below focus on *monotonic behavior*, ensuring that:
 Such properties are fundamental to the physical interpretation of
 thermal comfort and heat stress.
 """
+import pytest
 
-from psychchart.indexes.iti import ITU
+from psychchart.indexes.itu import ITU
 
 
 def test_itu_increases_with_temperature():
@@ -34,8 +35,8 @@ def test_itu_increases_with_temperature():
     rh = 0.5
 
     # Two temperatures, second higher than the first
-    v1 = ITU.compute(T=25.0, RH=rh)
-    v2 = ITU.compute(T=30.0, RH=rh)
+    v1 = ITU.compute({"T": 25.0, "RH": rh})
+    v2 = ITU.compute({"T": 30.0, "RH": rh})
 
     # Higher temperature must result in higher ITU
     assert v2 > v1
@@ -56,9 +57,15 @@ def test_itu_increases_with_humidity():
     temperature = 30.0
 
     # Two humidity levels, second higher than the first
-    v1 = ITU.compute(T=temperature, RH=0.4)
-    v2 = ITU.compute(T=temperature, RH=0.7)
+    v1 = ITU.compute({"T": temperature, "RH": 0.4})
+    v2 = ITU.compute({"T": temperature, "RH": 0.7})
 
     # Higher humidity must result in higher ITU
     assert v2 > v1
-
+    
+def test_itu_rejects_invalid_rh():
+    """
+    RH must be given as fraction in [0, 1].
+    """
+    with pytest.raises(ValueError):
+        ITU.compute({"T": 30.0, "RH": 1.2})
