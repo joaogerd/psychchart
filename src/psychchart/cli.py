@@ -15,6 +15,7 @@ to the loader and plotting modules.
 
 import sys
 import argparse
+import traceback
 
 from .plot import PsychChart
 from .loader import load_chart_config
@@ -67,15 +68,16 @@ def main() -> None:
         # Save output
         # -------------------------------------------------------------
         ax.figure.savefig(
-            cfg.output,
-            dpi=cfg.dpi,
+            chart.cfg.output,
+            dpi=chart.cfg.dpi,
             bbox_inches="tight"
         )
 
-        print(f"[OK] Chart successfully saved to '{cfg.output}'")
+        print(f"[OK] Chart successfully saved to '{chart.cfg.output}'")
 
     except Exception as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)
+        traceback.print_exc()
         sys.exit(1)
 
 

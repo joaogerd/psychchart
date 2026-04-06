@@ -8,88 +8,118 @@ chart:
   pressure: 101325
 
   y_min: 0.0
-  y_max: 0.085
+  y_max: 0.035
 
+  title: "Trajetória Térmica e Fadiga Acumulada"
+    
   output: psychchart_itu.png
   dpi: 200
-
-    #style: seaborn-v0_8
-    #title: "Psychrometric Chart with Temperature–Humidity Index (ITU)"
 
 
 # -----------------------------------------------------------------------------
 # Psychrometric isolines
 # -----------------------------------------------------------------------------
-isos:
-
-  - name: relative_humidity
+isolines:
+  relative_humidity:
     enabled: true
-    values: [0.2, 0.4, 0.6, 0.8]
-    color: crimson
-    style: "-"
-    linewidth: 1.0
-    alpha: 0.9
+    values: [0.1, 0.3, 0.5, 0.7, 0.9]
+    color: "#8B1E3F"
+    linestyle: "-"
+    linewidth: 0.7
+    alpha: 0.45
 
-  - name: wet_bulb
-    enabled: true
+  wet_bulb:
+    enabled: false
     values: [10, 15, 20, 25, 30, 35]
-    color: goldenrod
-    style: "--"
+    color: "#B8860B"
+    linestyle: "--"
     linewidth: 0.9
-    alpha: 0.8
+    alpha: 0.75
 
-  - name: moisture_quantity
-    enabled: true
+  moisture_quantity:
+    enabled: false
     values: [0.005, 0.010, 0.015, 0.020]
-    color: forestgreen
-    style: "-"
-    linewidth: 1.0
-    alpha: 0.9
+    color: "#2E6B57"
+    linestyle: ":"
+    linewidth: 0.95
+    alpha: 0.80
 
-  - name: enthalpy
+  enthalpy:
     enabled: false
+    values: [20, 40, 60, 80, 100]
+    color: "#355C7D"
+    linestyle: "-."
+    linewidth: 0.9
+    alpha: 0.70
 
-  - name: specific_volume
+  specific_volume:
     enabled: false
-
-
+    values: [0.78, 0.82, 0.86, 0.90, 0.94]
+    color: "#6C757D"
+    linestyle: "--"
+    linewidth: 0.8
+    alpha: 0.65
 # -----------------------------------------------------------------------------
 # Continuous ITU field (background)
 # -----------------------------------------------------------------------------
-index_fields:
+indexes:
   - index: ITU
+    label: ITU
 
-    # Canonical ITU stress thresholds
-    levels: [72, 78, 84, 90]
-
-    # Carefully chosen palette (literature-like)
-    cmap: Spectral_r
-
-    alpha: 0.45
-    colorbar: true
-
-    # Optional explicit range (keeps colors stable across plots)
-    vmin: 68
+      #    levels: &itu_levels [20, 72, 78, 84, 90, 200]
+    cmap: Pastel2
+    vmin: 20
     vmax: 95
 
+    render:
+      #field:
+      #  alpha: 0.65
+      #  colorbar: true
 
-# -----------------------------------------------------------------------------
-# ITU isolines (over the field)
-# -----------------------------------------------------------------------------
-indexes:
-  - name: ITU
-    mode: isolines
-    levels: [72, 78, 84]
-    style: "-"
-    color: black
-    linewidth: 1.2
+      isolines:
+        #levels: *itu_levels
+        style: ":"
+        color: black
+        linewidth: 1.5
+        label: true
 
+  - index: TE
+    label: Thermal Excess
 
+      #levels: [0, 1.5, 5.5, 11.0, 25]
+      #cmap: Pastel2
+    vmin: 0
+    vmax: 30
+
+    render:
+      field:
+        alpha: 1.0
+        colorbar: true
+
+# ------------------------------------------------------------------
+# Temporal overlays
+# ------------------------------------------------------------------
+
+temporal_overlays:
+  - type: CTA_TRAJECTORY
+    data: examples/animal_day.csv
+    t_col: temp
+    rh_col: rh
+    time_col: hour
+    cta_col: cta_acumulada
+
+    show_path: true
+    path_color: blue
+    path_alpha: 0.6
+    path_linewidth: 1.2
+
+    point_size: 46
+    point_edgecolor: black
+    point_edgewidth: 0.8
 # -----------------------------------------------------------------------------
 # Comfort zones (example – management-oriented)
 # -----------------------------------------------------------------------------
 zones:
-
   - name: Taurinos
     t_range: [15, 25]
     rh_range: [0.40, 0.70]
@@ -112,15 +142,15 @@ zones:
 # -----------------------------------------------------------------------------
 points:
 
-  - label: Sample_A
-    t: 32
-    rh: 0.55
+  - label: $P_{a}$
+    t: 32        # °C
+    rh: 0.55     # 55 %
     marker: "o"
     color: black
 
-  - label: Sample_B
-    t: 26
-    rh: 0.65
+  - label: $P_{b}$
+    t: 46
+    rh: 0.45
     marker: "s"
     color: navy
 
