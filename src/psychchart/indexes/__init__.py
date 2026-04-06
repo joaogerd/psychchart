@@ -1,56 +1,110 @@
 """
-Thermal and bioclimatic indexes.
+Index registry and public API for psychchart indexes.
 
-This subpackage aggregates thermal comfort and heat-stress indexes
-under a unified public API. It exposes both the abstract base class
-(:class:`ComfortIndex`) and concrete index implementations (e.g., ITU).
+This module exposes:
 
-Design goals
-------------
-- Provide a clear and stable import surface for users.
-- Allow interchangeable use of different indexes via a common interface.
-- Support scientific reproducibility by enforcing explicit documentation
-  of inputs and assumptions at the index level.
+- Built-in index classes
+- Centralized INDEX_REGISTRY
+- Utility functions for dynamic lookup
 
-Conceptual scope
-----------------
-Thermal and bioclimatic indexes are empirical or semi-empirical
-diagnostic tools that combine meteorological variables (temperature,
-humidity, wind, radiation) to interpret comfort or heat stress.
+Design Philosophy
+-----------------
+All indices are unified under BaseIndex and registered here.
 
-They are conceptually distinct from psychrometric relationships, but
-often rely on psychrometric variables as inputs.
+This eliminates:
 
-Currently implemented indexes
------------------------------
-- ITU (Temperature-Humidity Index)
-- HLI (Heat Load Index)
+- if/else chains
+- hard-coded imports
+- special cases for specific indices
 
-Future extensions may include:
-- BGHI (Black Globe Humidity Index)
-- UTCI (Universal Thermal Climate Index)
+The registry is the single source of truth.
 """
 
-# ---------------------------------------------------------------------
-# Public base class
-# ---------------------------------------------------------------------
-from .base import ComfortIndex
+from __future__ import annotations
+
+from typing import Type, Dict
+
+from .base import BaseIndex
+from .itu import ITU
+from .icf import ICF
+from .hli import HLI
+
 
 # ---------------------------------------------------------------------
-# Concrete index implementations
+# Central registry
 # ---------------------------------------------------------------------
-from .iti import ITU
-from .hli import HLI
+
+INDEX_REGISTRY: Dict[str, Type[BaseIndex]] = {
+    ITU.name: ITU,
+    ICF.name: ICF,
+    HLI.name: HLI,
+}
+
+
 # ---------------------------------------------------------------------
-# Public symbols exported by this module
-#
-# Using __all__ explicitly defines the public API and prevents
-# accidental exposure of internal helpers when using:
-#     from psychchart.indexes import *
+# Helper functions
 # ---------------------------------------------------------------------
+
+def get_index(name: str) -> Type[BaseIndex]:
+    """
+    Retrieve an index class by name.
+
+    Parameters
+    ----------
+    name : str
+        Index name (case-insensitive).
+
+    Returns
+    -------
+    Type[BaseIndex]
+        Corresponding index class.
+
+    Raises
+    ------
+    KeyError
+        If index is not registered.
+
+    Examples
+    --------
+    >>> idx_cls = get_index("ITU")
+    >>> idx_cls.name
+    'ITU'
+    """
+    key = name.upper()
+
+    if key not in INDEX_REGISTRY:
+        raise KeyError(
+            f"Unknown index '{name}'. "
+            f"Available: {list(INDEX_REGISTRY.keys())}"
+        )
+
+    return INDEX_REGISTRY[key]
+
+
+def list_indexes() -> list[str]:
+    """
+    List available index names.
+
+    Returns
+    -------
+    list of str
+        Registered index identifiers.
+
+    Examples
+    --------
+    >>> list_indexes()
+    ['ITU', 'ICF', 'HLI']
+    """
+    return sorted(INDEX_REGISTRY.keys())
+
+
 __all__ = [
-    "ComfortIndex",
+    "BaseIndex",
     "ITU",
+    "ICF",
     "HLI",
+    "INDEX_REGISTRY",
+    "get_index",
+    "list_indexes",
 ]
 

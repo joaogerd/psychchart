@@ -1,23 +1,23 @@
 """
-Temperature-Humidity Index (ITU / THI).
+Temperature-Humidity Index (ITI / THI).
 
-This module implements the Temperature-Humidity Index (ITU),
+This module implements the Temperature-Humidity Index (ITI),
 lso known internationally as the Temperature-Humidity Index (THI).
 
-The ITU is one of the most widely used empirical indexes for
+The ITI is one of the most widely used empirical indexes for
 assessing thermal comfort and heat stress, especially in
 livestock (cattle, dairy cows, beef cattle) and, historically,
 in human biometeorology.
 
 Scientific background
 ---------------------
-The ITU combines air temperature and relative humidity to
+The ITI combines air temperature and relative humidity to
 approximate the reduction in evaporative heat loss under
 humid conditions.
 
 Typical formulation (Thom, 1959; adapted forms widely used):
 
-    ITU = 0.8 * T + rh_percent * (T - 14.3)/100 + 46.3
+    ITI = 0.8 * T + rh_percent * (T - 14.3)/100 + 46.3
 
 Where:
 - T           : dry-bulb air temperature [°C]
@@ -34,22 +34,25 @@ Limitations
 - Accuracy decreases under extreme radiation or ventilation.
 - Best interpreted as a *screening index*, not a full heat balance.
 """
+from __future__ import annotations
+from typing import Dict, Any
+
 import numpy as np
-from .base import ComfortIndex
+from .base import BaseIndex
 
 
-class ITU(ComfortIndex):
+class ITI(BaseIndex):
     """
-    Temperature-Humidity Index (ITU).
+    Temperature-Humidity Index (ITI).
 
-    This class implements the ITU as a scalar thermal comfort
+    This class implements the ITI as a scalar thermal comfort
     or heat-stress diagnostic derived from air temperature and
     relative humidity.
 
     Attributes
     ----------
     name : str
-        Short name identifier of the index ("ITU").
+        Short name identifier of the index ("ITI").
 
     Notes
     -----
@@ -61,24 +64,28 @@ class ITU(ComfortIndex):
     """
 
     #: Human-readable identifier for the index
-    name = "ITU"
+    name = "ITI"
+    required_fields = {"T", "RH"}
 
     @staticmethod
-    def compute(T: float, RH: float) -> float:
+    def compute_vectorized(context: Dict[str, np.ndarray]) -> np.ndarray:
         """
-        Compute the Temperature-Humidity Index (ITU).
+        Compute the Temperature-Humidity Index (ITI).
 
         Parameters
         ----------
-        T : float
-            Dry-bulb air temperature in degrees Celsius (°C).
-
-        RH : float
-            Relative humidity as a fraction (0–1).
+        context : dict
+            Must contain:
+        
+                - T : float
+                      Dry-bulb air temperature in degrees Celsius (°C).
+        
+                - RH : float
+                       Relative humidity as a fraction (0–1).
 
         Returns
         -------
-        itu : float
+        ITI : float
             Computed Temperature-Humidity Index value (dimensionless).
 
         Raises
@@ -97,14 +104,14 @@ class ITU(ComfortIndex):
         --------
         Basic usage with scalar inputs::
 
-            from psychchart.indexes import ITU
+            from psychchart.indexes import ITI
 
-            itu = ITU.compute(T=30.0, RH=0.60)
-            print(f"ITU = {itu:.2f}")
+            ITI = ITI.compute(T=30.0, RH=0.60)
+            print(f"ITI = {ITI:.2f}")
 
         Typical interpretation in livestock studies::
 
-            ITU < 72   : thermal comfort
+            ITI < 72   : thermal comfort
             72–78      : mild heat stress
             78–84      : moderate heat stress
             > 84       : severe heat stress
@@ -115,15 +122,16 @@ class ITU(ComfortIndex):
             humidities   = [0.50, 0.60, 0.70]
 
             for T, RH in zip(temperatures, humidities):
-                itu = ITU.compute(T=T, RH=RH)
-                print(T, RH, itu)
+                ITI = ITI.compute(T=T, RH=RH)
+                print(T, RH, ITI)
         """
         # ------------------------------------------------------------------
         # Input validation
         # ------------------------------------------------------------------
         # Accept both scalars and arrays
-        RH = np.asarray(RH)
-        
+        T = float(context["T"])
+        RH = float(context["RH"])
+
         if np.any((RH < 0.0) | (RH > 1.0)):
             raise ValueError(
                 "Relative humidity (RH) must be given as a fraction "
@@ -132,16 +140,20 @@ class ITU(ComfortIndex):
 
         # ------------------------------------------------------------------
         # Convert relative humidity from fraction to percentage
-        # (required by the classical ITU formulation)
+        # (required by the classical ITI formulation)
         # ------------------------------------------------------------------
         rh_percent = RH * 100.0
 
         # ------------------------------------------------------------------
-        # ITU empirical formulation
+        # ITI empirical formulation
         # ------------------------------------------------------------------
-        itu = 0.8 * T + rh_percent * (T - 14.3)/100 + 46.3
-        return itu
-    
+        ITI = 0.8 * T + rh_percent * (T - 14.3)/100 + 46.3
+        return ITI
+
     @staticmethod
-    def evaluate(T, RH, **params):
-        return ITU.compute(T, RH)
+    def compute_vectorized(context: Dict[str, np.ndarray]) -> np.ndarray:
+        T = np.asarray(context["T"], dtype=float)
+        RH = np.asarray(context["RH"], dtype=float)
+
+        rh_percent = RH * 100.0
+        return 0.8 * T + rh_percent * (T - 14.3) / 100 + 46.3

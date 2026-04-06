@@ -79,6 +79,8 @@ class Psychrometrics:
         This formulation is valid for typical atmospheric
         temperatures encountered in psychrometric charts.
         """
+
+        T = np.asarray(T, dtype=float)
         return 610.94 * np.exp((17.625 * T) / (T + 243.04))
 
     # ------------------------------------------------------------------
@@ -109,7 +111,25 @@ class Psychrometrics:
 
         # Standard psychrometric relationship
         return 0.622 * p_v / (P - p_v)
+    
+    @staticmethod
+    def saturation_humidity_ratio(T, P=101325.0):
+        """
+        Saturation humidity ratio at dry-bulb temperature T.
 
+        Parameters
+        ----------
+        T : float or ndarray
+            Dry-bulb temperature (°C).
+        P : float, optional
+            Total pressure (Pa).
+
+        Returns
+        -------
+        W_sat : float or ndarray
+            Saturation humidity ratio (kg_vapor / kg_dry_air).
+        """
+        return Psychrometrics.humidity_ratio(T, 1.0, P)
     # ------------------------------------------------------------------
     @staticmethod
     def enthalpy(T, W):

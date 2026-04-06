@@ -48,6 +48,33 @@ Where:
 - Not intended for extreme climatic conditions
 
 ---
+## ICF — Functional Comfort Index
+
+ The Functional Comfort Index (ICF) quantifies the *instantaneous behavioral functionality* of an animal by contrasting productive behaviors (feeding and rumination) against compensatory thermoregulatory responses (panting). The ICF is defined as:
+
+ [
+ ICF = \frac{F + R}{F + R + P}
+ ]
+
+where (F) is feeding, (R) is rumination, and (P) is panting, measured on a common scale (e.g., minutes per hour, percentages, or consistent behavioral scores).
+
+ The ICF is bounded within ([0,1]) for non-negative inputs and a positive denominator. Values closer to 1 indicate higher relative behavioral functionality (i.e., the animal is allocating a larger fraction of its behavioral budget to feeding and rumination rather than panting). Values closer to 0 indicate dominance of compensatory behavior.
+
+**Interpretation note:** ICF does **not** define absolute thermal comfort. A high ICF indicates high *relative functionality* within the observed context; the animal’s typical baseline may still correspond to suboptimal thermal conditions. Absolute comfort requires explicit physiological criteria (e.g., near-zero panting and maximal allocation to productive behaviors), which are handled at the inference/zoning layer.
+
+---
+
+ ### ICFP — Standardized Functional Comfort Index
+
+ The standardized Functional Comfort Index (ICFP) is obtained through post-processing of the instantaneous ICF values relative to a reference distribution. The standardization is performed using a z-score transformation:
+
+ [
+ ICFP = \frac{ICF - \mu_{ref}}{\sigma_{ref}}
+ ]
+
+where (\mu_{ref}) and (\sigma_{ref}) are the mean and standard deviation of the ICF within the chosen reference (e.g., individual animal, group, or time window). The ICFP quantifies relative deviations from the typical functional state and enables comparison across animals, environments, and periods. Importantly, the ICFP does not represent absolute thermal comfort.
+
+---
 
 ## Future extensions
 
@@ -63,5 +90,9 @@ Planned indexes include:
 - Thom, E. C. (1959). The discomfort index.
 - Hahn, G. L. (1999). Dynamic responses of cattle to thermal heat loads.
 - Gaughan et al. (2008). Heat Load Index for feedlot cattle.
+
+
+
+
 
 

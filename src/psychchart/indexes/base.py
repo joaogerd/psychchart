@@ -1,161 +1,214 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Union
+from typing import Dict, Any, Set
 import numpy as np
 
-# ----------------------------------------------------------------------
-# Public type alias for scalar or vector inputs
-# ----------------------------------------------------------------------
-ArrayLike = Union[float, np.ndarray]
 
-
-class ComfortIndex(ABC):
+class BaseIndex(ABC):
     """
-    Abstract base class for thermal and bioclimatic comfort indexes.
+    Abstract base class for all psychrometric indexes.
 
-    This class defines the **minimal and canonical interface**
-    that all thermal comfort or heat-stress indexes must follow
-    in the psychchart ecosystem.
+    This class defines the unified evaluation interface for both:
 
-    Conceptual model
-    ----------------
-    A comfort index is treated as a **pure diagnostic function**
-    that maps environmental conditions to a scalar indicator of
-    thermal comfort or heat stress.
+        • Domain-based indexes  (continuous grid evaluation)
+        • Data-based indexes    (record-level evaluation)
 
-    Design contract
-    ---------------
-    All subclasses MUST obey the following rules:
+    Subclasses must define:
 
-    1. Stateless
-       - Index classes must not store internal state.
-       - All required information must be passed explicitly
-         during evaluation.
+        - ``name`` (str)
+        - ``required_fields`` (set[str])
+        - ``compute(context)``
 
-    2. Canonical input space
-       - Evaluation is always performed in:
-         - dry-bulb temperature (T, °C)
-         - relative humidity (RH, fraction 0–1)
+    They MAY override:
 
-    3. Explicit parameters
-       - Any additional environmental or physiological variables
-         (e.g., wind speed, solar radiation) must be passed
-         explicitly via ``**params``.
-
-    4. Vectorized behavior
-       - Implementations must support both scalar inputs and
-         NumPy arrays transparently.
-
-    This strict contract ensures that:
-    - indexes are interchangeable,
-    - plotting logic remains generic,
-    - scientific assumptions are explicit,
-    - and future extensions (e.g., new indexes) remain safe.
-
-    Responsibilities
-    ----------------
-    - Define the evaluation interface for comfort indexes
-    - Enforce consistency across different index implementations
-
-    Non-responsibilities
-    --------------------
-    - Psychrometric conversions (T–RH → W, h, etc.)
-    - Input validation or unit conversion
-    - Plotting or visualization
-    - Configuration or parameter storage
+        - ``compute_vectorized(context)`` for performance.
 
     Attributes
     ----------
     name : str
-        Human-readable identifier of the index
-        (e.g., ``"ITU"``, ``"THI"``, ``"HLI"``, ``"UTCI"``).
+        Unique identifier for the index.
 
-        This attribute is used for:
-        - labeling plots,
-        - legend entries,
-        - dispatching logic.
+    required_fields : set of str
+        Context keys required for computation.
+        Example: {"T", "RH"}.
 
     Notes
     -----
-    - Subclasses should normally implement ``evaluate`` as a
-      ``@staticmethod`` to reinforce statelessness.
-    - This base class intentionally avoids enforcing a specific
-      unit system beyond what is documented.
+    • Context is a dictionary mapping variable names to values.
+
+    • Values may be:
+        - scalars (float)
+        - numpy arrays (vectorized evaluation)
+
+    • If numpy arrays are detected, the class will attempt to use
+      ``compute_vectorized``. If not implemented, a fallback loop
+      may be applied.
+
+    • This abstraction allows unified use in:
+
+        - build_index_field()
+        - observation pipelines
+        - CLI evaluation
+        - future hybrid systems
+
+    Examples
+    --------
+    Minimal index implementation:
+
+    >>> class SimpleTHI(BaseIndex):
+    ...     name = "THI"
+    ...     required_fields = {"T", "RH"}
+    ...
+    ...     @staticmethod
+    ...     def compute(context):
+    ...         T = context["T"]
+    ...         RH = context["RH"]
+    ...         return T - (0.55 - 0.0055 * RH) * (T - 14.5)
+
+    Scalar evaluation:
+
+    >>> SimpleTHI.evaluate({"T": 30.0, "RH": 0.7})
+
+    Vectorized evaluation:
+
+    >>> T = np.array([25.0, 30.0])
+    >>> RH = np.array([0.6, 0.7])
+    >>> SimpleTHI.evaluate({"T": T, "RH": RH})
+
+    See Also
+    --------
+    build_index_field :
+        Builds continuous domain scalar fields.
+
+    FunctionalObservations :
+        Observation-based evaluation pipeline.
     """
 
-    #: Human-readable name of the index (must be overridden by subclasses)
-    name: str
+    name: str = "UnnamedIndex"
+    required_fields: Set[str] = set()
 
     # ------------------------------------------------------------------
-    # Canonical evaluation interface
+    # Context validation
     # ------------------------------------------------------------------
-    @staticmethod
-    @abstractmethod
-    def evaluate(
-        T: ArrayLike,
-        RH: ArrayLike,
-        **params,
-    ) -> ArrayLike:
+    @classmethod
+    def validate_context(cls, context: Dict[str, Any]) -> None:
         """
-        Evaluate the comfort index.
-
-        This method defines the **canonical computation interface**
-        shared by all comfort and bioclimatic indexes.
-
-        Implementations must accept both scalars and NumPy arrays
-        and return values with matching shape.
+        Ensure all required fields are present in context.
 
         Parameters
         ----------
-        T : float or numpy.ndarray
-            Dry-bulb air temperature [°C].
+        context : dict
+            Input context dictionary.
 
-        RH : float or numpy.ndarray
-            Relative humidity as a fraction in the range [0, 1].
+        Raises
+        ------
+        ValueError
+            If required fields are missing.
+        """
+        missing = cls.required_fields - context.keys()
+        if missing:
+            raise ValueError(
+                f"Index '{cls.name}' missing required fields: {missing}"
+            )
 
-        **params : dict
-            Index-specific auxiliary parameters.
+    # ------------------------------------------------------------------
+    # Unified evaluation entry point
+    # ------------------------------------------------------------------
+    @classmethod
+    def evaluate(cls, context: Dict[str, Any]):
+        """
+        Evaluate the index given a context.
 
-            Examples include:
-            - ``WS`` : wind speed [m s⁻¹]
-            - ``SR`` : solar radiation [W m⁻²]
-            - ``MR`` : metabolic rate
-            - ``CLO`` : clothing insulation
+        Automatically detects scalar vs. vectorized input.
 
-            The meaning and units of these parameters are defined
-            by each concrete index implementation.
+        Parameters
+        ----------
+        context : dict
+            Dictionary mapping required fields to values.
 
         Returns
         -------
-        float or numpy.ndarray
-            Computed index value(s), with shape compatible
-            with the input ``T`` and ``RH``.
+        float or np.ndarray
+            Computed index value(s).
+        """
+        cls.validate_context(context)
+
+        # Detect array-based evaluation
+        sample_value = next(iter(context.values()))
+
+        if isinstance(sample_value, np.ndarray):
+            try:
+                return cls.compute_vectorized(context)
+            except NotImplementedError:
+                # Fallback to scalar loop
+                return cls._fallback_vectorized(context)
+
+        return cls.compute(context)
+
+    # ------------------------------------------------------------------
+    # Scalar computation (mandatory)
+    # ------------------------------------------------------------------
+    @staticmethod
+    @abstractmethod
+    def compute(context: Dict[str, Any]) -> float:
+        """
+        Scalar computation of the index.
+
+        Must be implemented by subclasses.
+
+        Parameters
+        ----------
+        context : dict
+
+        Returns
+        -------
+        float
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Vectorized computation (optional)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def compute_vectorized(context: Dict[str, Any]):
+        """
+        Vectorized computation of the index.
+
+        Subclasses SHOULD override this method for performance.
 
         Raises
         ------
         NotImplementedError
-            If the subclass does not implement this method.
-
-        Examples
-        --------
-        Scalar usage:
-
-        >>> ITUIndex.evaluate(T=30.0, RH=0.65)
-        78.4
-
-        Vectorized usage:
-
-        >>> T = np.array([25.0, 30.0, 35.0])
-        >>> RH = np.array([0.5, 0.6, 0.7])
-        >>> ITUIndex.evaluate(T, RH)
-        array([72.1, 78.4, 84.9])
-
-        With auxiliary parameters:
-
-        >>> HLIIndex.evaluate(
-        ...     T, RH,
-        ...     WS=2.0,
-        ...     SR=600.0
-        ... )
         """
-        raise NotImplementedError
+        raise NotImplementedError(
+            "Vectorized computation not implemented."
+        )
+
+    # ------------------------------------------------------------------
+    # Automatic fallback vectorization
+    # ------------------------------------------------------------------
+    @classmethod
+    def _fallback_vectorized(cls, context: Dict[str, Any]):
+        """
+        Fallback vectorization using scalar compute.
+
+        This method iterates over flattened arrays and applies
+        scalar compute element-wise.
+
+        This is slower but guarantees compatibility.
+        """
+        arrays = {k: np.asarray(v) for k, v in context.items()}
+        shape = next(iter(arrays.values())).shape
+
+        flat_results = []
+
+        for i in range(arrays[next(iter(arrays))].size):
+            scalar_context = {
+                k: v.flatten()[i]
+                for k, v in arrays.items()
+            }
+            flat_results.append(cls.compute(scalar_context))
+
+        return np.array(flat_results).reshape(shape)
 
