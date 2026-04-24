@@ -33,6 +33,7 @@ The package separates **physics**, **configuration**, **data layers**, and
 - 🧪 Automated tests for numerical consistency and plotting stability
 - 🧩 Extensible architecture for ITU, HLI, thermal excess, custom zones, data layers, and operational overlays
 - 🐄 Bovine bioclimatic chart examples combining ITU fields, literature envelopes, accumulated load, and cooling-management regions
+- 🖥️ Optional Streamlit app for interactive layer control, YAML editing, point readout, and PNG/YAML export
 
 ---
 
@@ -68,6 +69,12 @@ For development:
 
 ```bash
 pip install -e .[dev]
+```
+
+For the interactive app:
+
+```bash
+pip install -e .[app]
 ```
 
 For parquet data layers:
@@ -106,6 +113,33 @@ This produces a valid psychrometric chart with:
 
 - saturation curve (100% RH)
 - relative humidity isolines at 40%, 60% and 80%
+
+---
+
+## Interactive app
+
+psychChart includes an optional Streamlit app that provides an Andrew Marsh-like
+interactive workflow while preserving YAML as the source of truth.
+
+Run it with:
+
+```bash
+streamlit run src/psychchart/app/streamlit_app.py
+```
+
+The app currently supports:
+
+- built-in templates, including a bovine bioclimatic chart;
+- chart-domain controls for temperature, humidity-ratio range, and pressure;
+- layer toggles for RH isolines, index layers, zones, data layers, and operational overlays;
+- operational controls for accumulated-load class, trend, and overlay alpha;
+- point readout for T, RH, humidity ratio, enthalpy, dew point, and ITU;
+- editable YAML panel;
+- YAML export;
+- PNG export.
+
+The Python/YAML rendering core remains unchanged. The app is only an interactive
+control layer over the same validated configuration model used by the CLI.
 
 ---
 
@@ -381,6 +415,7 @@ psychchart/
 │   └── data/
 │
 ├── src/psychchart/
+│   ├── app/
 │   ├── config/
 │   ├── data/
 │   ├── indexes/
@@ -404,6 +439,7 @@ The project is organized around a strict separation of concerns:
 - **config / loader**: declarative configuration and normalization
 - **data**: runtime data-layer processing
 - **plot**: visualization and rendering only
+- **app**: optional interactive Streamlit layer
 - **CLI**: thin execution layer
 
 This design ensures scientific transparency, reproducibility, and long-term
