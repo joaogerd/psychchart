@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+### Added
+- Bovine bioclimatic chart concept documentation.
+- Final Azevedo et al. (2005) bovine bioclimatic chart example combining psychrometrics, ITU field, ITU isolines, experimental T x RH envelopes, CTA-classified trajectory, and accumulated-load legend.
+- Operational overlay layer for management-action fields over psychrometric space.
+- Built-in `dairy_cooling_default` operational profile for routine dairy-cattle cooling examples.
+- Operational overlay documentation and smoke tests.
+- Smoke tests for bovine bioclimatic examples.
+
+### Changed
+- Operational overlays are rendered as clean classified contour regions instead of raster-like quadrilateral meshes.
+- `thermal_trajectory_classified.yaml` now uses the built-in dairy operational profile by default.
+- Runtime payload now carries operational profiles and overlays to the plotting layer.
+- Zone labels support fractional Matplotlib font sizes.
+- Runtime dependencies now explicitly include `pandas` and `pydantic>=2`; `pyarrow` is declared as an optional parquet extra.
+
+### Fixed
+- Optional operational modifiers with explicit `None` values are now safely ignored.
+- Operational overlays now use the registered ITU implementation instead of the obsolete experimental domain engine.
+- Operational overlays now resolve humidity ratio through the current psychrometric API.
+- Example data paths were normalized to tracked files under `examples/data/`.
+
 ## [0.3.0] - 2026-02-15
 ### Added
 - Separation of index architecture into `domain/` and `data/`
