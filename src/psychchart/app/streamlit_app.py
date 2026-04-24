@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -45,65 +46,107 @@ def _uploaded_text(uploaded_file) -> str | None:
     return uploaded_file.getvalue().decode("utf-8")
 
 
+def _layer_count(data: dict, key: str) -> int:
+    value = data.get(key)
+    if isinstance(value, list):
+        return len(value)
+    if isinstance(value, dict):
+        return len(value)
+    return 0
+
+
+def _build_report(data: dict, yaml_text: str) -> str:
+    chart = data.get("chart", {}) or {}
+    return "\n".join(
+        [
+            "# psychChart interactive report",
+            "",
+            "## Chart domain",
+            f"- Temperature range: {chart.get('t_min')} to {chart.get('t_max')} °C",
+            f"- Humidity-ratio range: {chart.get('y_min')} to {chart.get('y_max')} kg/kg dry air",
+            f"- Pressure: {chart.get('pressure')} Pa",
+            f"- Title: {chart.get('title', '')}",
+            "",
+            "## Active sections",
+            f"- Isoline groups: {_layer_count(data, 'isolines')}",
+            f"- Index layers: {_layer_count(data, 'indexes')}",
+            f"- Zones/envelopes: {_layer_count(data, 'zones')}",
+            f"- Data layers: {_layer_count(data, 'data_layers')}",
+            f"- Operational overlays: {_layer_count(data, 'operational_overlays')}",
+            "",
+            "## Reproducibility note",
+            "This report was generated from the YAML configuration below. The YAML is the source of truth for the chart.",
+            "",
+            "```yaml",
+            yaml_text.rstrip(),
+            "```",
+            "",
+        ]
+    )
+
+
 def _apply_controls(st, data: dict) -> dict:
     edited = dict(data)
     chart = dict(edited.get("chart", {}))
     edited["chart"] = chart
 
-    st.sidebar.subheader("Chart domain")
-    chart["t_min"] = st.sidebar.number_input("T min", value=float(chart.get("t_min", 10.0)))
-    chart["t_max"] = st.sidebar.number_input("T max", value=float(chart.get("t_max", 45.0)))
-    chart["y_min"] = st.sidebar.number_input("W min", value=float(chart.get("y_min", 0.0)), format="%.4f")
-    chart["y_max"] = st.sidebar.number_input("W max", value=float(chart.get("y_max", 0.035)), format="%.4f")
-    chart["pressure"] = st.sidebar.number_input("Pressure", value=float(chart.get("pressure", 101325.0)), step=100.0)
+    with st.sidebar.expander("Chart domain", expanded=True):
+        chart["t_min"] = st.number_input("T min", value=float(chart.get("t_min", 10.0)))
+        chart["t_max"] = st.number_input("T max", value=float(chart.get("t_max", 45.0)))
+        chart["y_min"] = st.number_input("W min", value=float(chart.get("y_min", 0.0)), format="%.4f")
+        chart["y_max"] = st.number_input("W max", value=float(chart.get("y_max", 0.035)), format="%.4f")
+        chart["pressure"] = st.number_input("Pressure", value=float(chart.get("pressure", 101325.0)), step=100.0)
 
-    st.sidebar.subheader("Layers")
-    if not st.sidebar.checkbox("RH isolines", value="relative_humidity" in edited.get("isolines", {})):
-        isolines = dict(edited.get("isolines", {}))
-        isolines.pop("relative_humidity", None)
-        edited["isolines"] = isolines
-    if not st.sidebar.checkbox("Index layers", value=bool(edited.get("indexes"))):
-        edited["indexes"] = []
-    if not st.sidebar.checkbox("Zones", value=bool(edited.get("zones"))):
-        edited["zones"] = []
-    if not st.sidebar.checkbox("Data layers", value=bool(edited.get("data_layers"))):
-        edited["data_layers"] = []
-    if not st.sidebar.checkbox("Operational overlay", value=bool(edited.get("operational_overlays"))):
-        edited["operational_overlays"] = []
-    elif edited.get("operational_overlays"):
-        st.sidebar.subheader("Operational state")
-        overlay = dict(edited["operational_overlays"][0])
-        overlay["load_class"] = st.sidebar.selectbox("Load class", ["A0", "A1", "A2", "A3", "A4"], index=2)
-        overlay["trend"] = st.sidebar.selectbox("Trend", ["falling", "steady", "rising"], index=1)
-        overlay["alpha"] = st.sidebar.slider("Operational alpha", 0.0, 0.7, float(overlay.get("alpha", 0.18)), 0.01)
-        edited["operational_overlays"] = [overlay]
+    with st.sidebar.expander("Layer manager", expanded=True):
+        if not st.checkbox("RH isolines", value="relative_humidity" in edited.get("isolines", {})):
+            isolines = dict(edited.get("isolines", {}))
+            isolines.pop("relative_humidity", None)
+            edited["isolines"] = isolines
+        if not st.checkbox("Index layers", value=bool(edited.get("indexes"))):
+            edited["indexes"] = []
+        if not st.checkbox("Zones", value=bool(edited.get("zones"))):
+            edited["zones"] = []
+        if not st.checkbox("Data layers", value=bool(edited.get("data_layers"))):
+            edited["data_layers"] = []
+        show_operational = st.checkbox("Operational overlay", value=bool(edited.get("operational_overlays")))
+        if not show_operational:
+            edited["operational_overlays"] = []
+
+    if edited.get("operational_overlays"):
+        with st.sidebar.expander("Operational state", expanded=True):
+            overlay = dict(edited["operational_overlays"][0])
+            overlay["load_class"] = st.selectbox("Load class", ["A0", "A1", "A2", "A3", "A4"], index=2)
+            overlay["trend"] = st.selectbox("Trend", ["falling", "steady", "rising"], index=1)
+            overlay["alpha"] = st.slider("Operational alpha", 0.0, 0.7, float(overlay.get("alpha", 0.18)), 0.01)
+            edited["operational_overlays"] = [overlay]
 
     return edited
 
 
 def _apply_csv_import(st, data: dict) -> dict:
-    st.sidebar.subheader("CSV data import")
-    uploaded_csv = st.sidebar.file_uploader("Overlay CSV", type=["csv"], key="csv_overlay")
-    if uploaded_csv is None:
-        return data
+    with st.sidebar.expander("CSV data import", expanded=False):
+        uploaded_csv = st.file_uploader("Overlay CSV", type=["csv"], key="csv_overlay")
+        if uploaded_csv is None:
+            return data
 
-    df = pd.read_csv(uploaded_csv)
-    columns = list(df.columns)
-    if not columns:
-        return data
+        df = pd.read_csv(uploaded_csv)
+        columns = list(df.columns)
+        if not columns:
+            return data
 
-    t_col = st.sidebar.selectbox("Temperature column", columns, index=0)
-    rh_col = st.sidebar.selectbox("RH column", columns, index=min(1, len(columns) - 1))
-    time_options = ["<none>"] + columns
-    time_col = st.sidebar.selectbox("Time/order column", time_options, index=0)
-    value_options = ["<none>"] + columns
-    value_col = st.sidebar.selectbox("Class/value column", value_options, index=0)
-    render_mode = st.sidebar.selectbox("CSV render", ["scatter", "path", "classified_points"], index=0)
+        t_col = st.selectbox("Temperature column", columns, index=0)
+        rh_col = st.selectbox("RH column", columns, index=min(1, len(columns) - 1))
+        time_options = ["<none>"] + columns
+        time_col = st.selectbox("Time/order column", time_options, index=0)
+        value_options = ["<none>"] + columns
+        value_col = st.selectbox("Class/value column", value_options, index=0)
+        render_mode = st.selectbox("CSV render", ["scatter", "path", "classified_points"], index=0)
+        replace_existing = st.checkbox("Replace existing data layers", value=True)
 
     path = Path(tempfile.gettempdir()) / "psychchart_streamlit_overlay.csv"
     df.to_csv(path, index=False)
 
-    layer = {
+    layer: dict[str, Any] = {
         "data": str(path),
         "format": "csv",
         "projection": {"t_col": t_col, "rh_col": rh_col, "rh_unit": "auto"},
@@ -129,7 +172,10 @@ def _apply_csv_import(st, data: dict) -> dict:
         layer["render"].append(render)
 
     edited = dict(data)
-    edited["data_layers"] = [layer]
+    if replace_existing:
+        edited["data_layers"] = [layer]
+    else:
+        edited["data_layers"] = list(edited.get("data_layers", []) or []) + [layer]
     return edited
 
 
@@ -143,24 +189,24 @@ def _render(yaml_text: str):
         return chart.fig
 
 
-def _png_bytes(fig) -> bytes:
+def _figure_bytes(fig, fmt: str, dpi: int = 180) -> bytes:
     buffer = io.BytesIO()
-    fig.savefig(buffer, format="png", dpi=180, bbox_inches="tight")
+    fig.savefig(buffer, format=fmt, dpi=dpi, bbox_inches="tight")
     buffer.seek(0)
     return buffer.getvalue()
 
 
 def _point_readout(st, pressure: float) -> None:
-    st.sidebar.subheader("Point readout")
-    T = st.sidebar.number_input("Readout T", value=30.0, step=0.5)
-    RH_pct = st.sidebar.number_input("Readout RH (%)", value=70.0, min_value=0.0, max_value=100.0, step=1.0)
-    RH = RH_pct / 100.0
-    W = Psychrometrics.humidity_ratio(T, RH, pressure)
-    h = Psychrometrics.enthalpy(T, W)
-    Tdp = Psychrometrics.dew_point_temperature(RH, T)
-    itu = ITU.compute({"T": T, "RH": RH})
-    st.sidebar.metric("ITU", f"{itu:.1f}")
-    st.sidebar.caption(f"W={W:.5f} kg/kg | h={h:.1f} kJ/kg | Tdp={Tdp:.1f} C")
+    with st.sidebar.expander("Point readout", expanded=True):
+        T = st.number_input("Readout T", value=30.0, step=0.5)
+        RH_pct = st.number_input("Readout RH (%)", value=70.0, min_value=0.0, max_value=100.0, step=1.0)
+        RH = RH_pct / 100.0
+        W = Psychrometrics.humidity_ratio(T, RH, pressure)
+        h = Psychrometrics.enthalpy(T, W)
+        Tdp = Psychrometrics.dew_point_temperature(RH, T)
+        itu = ITU.compute({"T": T, "RH": RH})
+        st.metric("ITU", f"{itu:.1f}")
+        st.caption(f"W={W:.5f} kg/kg | h={h:.1f} kJ/kg | Tdp={Tdp:.1f} C")
 
 
 def main() -> None:
@@ -179,6 +225,7 @@ def main() -> None:
     data = _apply_controls(st, _load_yaml(st.session_state.yaml_text))
     data = _apply_csv_import(st, data)
     yaml_text = _dump_yaml(data)
+    report_text = _build_report(data, yaml_text)
     _point_readout(st, float(data.get("chart", {}).get("pressure", 101325.0)))
 
     left, right = st.columns([0.60, 0.40], gap="large")
@@ -186,12 +233,19 @@ def main() -> None:
         st.subheader("YAML source of truth")
         yaml_text = st.text_area("Edit YAML", value=yaml_text, height=680)
         st.download_button("Download YAML", yaml_text.encode("utf-8"), "psychchart_interactive.yaml", "text/yaml")
+        st.download_button("Download report", report_text.encode("utf-8"), "psychchart_report.md", "text/markdown")
     with left:
         st.subheader("Chart preview")
         try:
             fig = _render(yaml_text)
             st.pyplot(fig, clear_figure=False)
-            st.download_button("Download PNG", _png_bytes(fig), "psychchart_interactive.png", "image/png")
+            export_cols = st.columns(3)
+            with export_cols[0]:
+                st.download_button("PNG", _figure_bytes(fig, "png"), "psychchart_interactive.png", "image/png")
+            with export_cols[1]:
+                st.download_button("SVG", _figure_bytes(fig, "svg"), "psychchart_interactive.svg", "image/svg+xml")
+            with export_cols[2]:
+                st.download_button("PDF", _figure_bytes(fig, "pdf"), "psychchart_interactive.pdf", "application/pdf")
             plt.close(fig)
         except Exception as exc:
             st.error(str(exc))
