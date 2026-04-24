@@ -1,0 +1,31 @@
+chart:
+  t_min: 10
+  t_max: 40
+  y_min: 0.0
+  y_max: 0.030
+  pressure: 101325
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg)"
+  dpi: 150
+  title: "Data layer - scalar field"
+  output: "out_scalar_field.png"
+
+data_layers:
+  - data: "examples/data/observations.csv"
+    format: csv
+    projection:
+      t_col: T
+      rh_col: RH
+      rh_unit: fraction
+    fields:
+      - type: direct_column
+        name: comfort_score
+        col: comfort_score
+    render:
+      - type: scalar_field
+        value: comfort_score
+        bins: [24, 24]
+        cmap: plasma
+        alpha: 0.75
+        colorbar: true
+        zorder: 25

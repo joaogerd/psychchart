@@ -27,9 +27,11 @@ The configuration package is organized by responsibility:
 - ``indexes``:
   computed index configuration and rendering
 - ``observations``:
-  observational dataset configuration
+  legacy observational dataset configuration
 - ``overlays``:
-  temporal trajectory overlays
+  legacy temporal trajectory overlays
+- ``data_layers``:
+  canonical unified configuration for dataset-driven layers
 - ``app``:
   validated root application configuration
 - ``paths``:
@@ -132,6 +134,33 @@ from .observations import (
 from .overlays import TemporalOverlayConfig
 
 # -----------------------------------------------------------------------------
+# Canonical unified data-layer configuration
+# -----------------------------------------------------------------------------
+from .data_layers import (
+    ProjectionConfig,
+    TemporalConfig,
+    DirectColumnFieldConfig,
+    DataIndexFieldConfig,
+    PointsRenderConfig,
+    ScatterRenderConfig,
+    DensityRenderConfig as DataLayerDensityRenderConfig,
+    ScalarFieldRenderConfig,
+    PathRenderConfig,
+    AnnotateRenderConfig,
+    DataLayerConfig,
+)
+
+# -----------------------------------------------------------------------------
+# Global declarative legend configuration.
+# -----------------------------------------------------------------------------
+from .legend import (
+        LegendPatchEntry,
+        LegendLineEntry,
+        LegendMarkerEntry,
+        LegendConfig,
+)
+
+# -----------------------------------------------------------------------------
 # Shared strict validation base
 # -----------------------------------------------------------------------------
 # ``StrictModel`` is the common strict Pydantic base used by the public
@@ -145,6 +174,14 @@ from .base import StrictModel
 # optional scalar values for progressive color mapping.
 from .paths import PathConfig
 
+
+# -----------------------------------------------------------------------------
+#
+# -----------------------------------------------------------------------------
+from .operations import (
+    OperationalOverlayConfig,
+    OperationalProfileConfig,
+)
 # -----------------------------------------------------------------------------
 # Optional explicit public export list
 # -----------------------------------------------------------------------------
@@ -166,6 +203,23 @@ __all__: list[str] = [
     "DataIndexConfig",
     "ObservationsConfig",
     "TemporalOverlayConfig",
+    "ProjectionConfig",
+    "TemporalConfig",
+    "DirectColumnFieldConfig",
+    "DataIndexFieldConfig",
+    "PointsRenderConfig",
+    "ScatterRenderConfig",
+    "DataLayerDensityRenderConfig",
+    "ScalarFieldRenderConfig",
+    "PathRenderConfig",
+    "AnnotateRenderConfig",
+    "DataLayerConfig",
     "PathConfig",
+    "LegendPatchEntry",
+    "LegendLineEntry",
+    "LegendMarkerEntry",
+    "LegendConfig",
+    "OperationalOverlayConfig",
+    "OperationalProfileConfig",
     "StrictModel",
 ]

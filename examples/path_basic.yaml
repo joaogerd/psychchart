@@ -1,0 +1,28 @@
+chart:
+  t_min: 10
+  t_max: 45
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+  title: "Basic ordered path"
+  output: "path_basic.png"
+  dpi: 180
+
+data_layers:
+  - data: "examples/data/animal_day.csv"
+    format: "csv"
+    projection:
+      t_col: temp
+      rh_col: rh
+      rh_unit: auto
+    temporal:
+      time_col: hour
+      sort: true
+    render:
+      - type: path
+        color: "black"
+        alpha: 0.95
+        linewidth: 2.0
+        linestyle: "-"
+        label: "Daily cycle"
+        zorder: 30

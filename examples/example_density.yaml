@@ -1,0 +1,27 @@
+chart:
+  t_min: 10
+  t_max: 40
+  y_min: 0.0
+  y_max: 0.030
+  pressure: 101325
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg)"
+  dpi: 150
+  title: "Data layer - density"
+  output: "out_density.png"
+
+data_layers:
+  - data: "examples/data/observations.csv"
+    format: csv
+    projection:
+      t_col: T
+      rh_col: RH
+      rh_unit: fraction
+    render:
+      - type: density
+        bins: [30, 30]
+        cmap: magma
+        alpha: 0.55
+        colorbar: true
+        normalize: true
+        zorder: 20

@@ -1,0 +1,173 @@
+"""
+Renderer for operational cooling zones.
+
+This layer draws explicit operational policy fields over the psychrometric
+space without mixing operational recommendations into the core index logic.
+"""
+
+from __future__ import annotations
+
+from typing import Callable
+
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.axes import Axes
+from matplotlib.colors import BoundaryNorm, ListedColormap
+from matplotlib.patches import Patch
+
+from psychchart.config.operations import OperationalOverlayConfig
+from psychchart.operations.enums import OperationalAction, TrendMode
+from psychchart.operations.zones import build_operational_zone_field
+
+
+def _default_itu_evaluator(T: np.ndarray, RH: np.ndarray) -> np.ndarray:
+    """Evaluate ITU on array inputs."""
+    from psychchart.indexes.domain.engine import evaluate_index
+
+    return evaluate_index("ITU", T=T, RH=RH)
+
+
+def _resolve_humidity_ratio_evaluator(
+    chart,
+) -> Callable[[np.ndarray, np.ndarray], np.ndarray]:
+    """
+    Resolve a humidity-ratio evaluator from the live chart object.
+    """
+    candidates = []
+
+    psychro = getattr(chart, "psychrometrics", None)
+    if psychro is not None:
+        candidates.extend(
+            [
+                getattr(psychro, "humidity_ratio_from_rh", None),
+                getattr(psychro, "get_humidity_ratio_from_rh", None),
+                getattr(psychro, "w_from_t_rh", None),
+            ]
+        )
+
+    chart_psychro = getattr(chart, "psychro", None)
+    if chart_psychro is not None:
+        candidates.extend(
+            [
+                getattr(chart_psychro, "humidity_ratio_from_rh", None),
+                getattr(chart_psychro, "get_humidity_ratio_from_rh", None),
+                getattr(chart_psychro, "w_from_t_rh", None),
+            ]
+        )
+
+    for candidate in candidates:
+        if callable(candidate):
+            return candidate
+
+    raise AttributeError(
+        "Could not resolve a humidity-ratio evaluator from chart. "
+        "Expected one of: "
+        "'chart.psychrometrics.humidity_ratio_from_rh', "
+        "'chart.psychrometrics.get_humidity_ratio_from_rh', "
+        "'chart.psychrometrics.w_from_t_rh', "
+        "or equivalent under 'chart.psychro'."
+    )
+
+
+def _build_action_colormap(profile):
+    """Build categorical colormap and norm for operational actions."""
+    ordered_actions = list(OperationalAction)
+    colors = [profile.action_styles[action].facecolor for action in ordered_actions]
+    cmap = ListedColormap(colors)
+    norm = BoundaryNorm(np.arange(-0.5, len(ordered_actions) + 0.5, 1.0), cmap.N)
+    return cmap, norm
+
+
+def _legend_handles(profile):
+    """Build proxy legend handles for operational actions."""
+    handles = []
+    for action in OperationalAction:
+        style = profile.action_styles[action]
+        handles.append(
+            Patch(
+                facecolor=style.facecolor,
+                edgecolor=style.edgecolor,
+                hatch=style.hatch,
+                label=style.label,
+            )
+        )
+    return handles
+
+
+def draw_operational_zones(
+    ax: Axes,
+    chart,
+    cfg: OperationalOverlayConfig,
+) -> None:
+    """
+    Draw one operational overlay for one accumulated-load class and trend.
+    """
+    operational_profiles = getattr(chart, "operational_profiles", None)
+    if operational_profiles is None:
+        raise AttributeError(
+            "PsychChart instance has no 'operational_profiles'. "
+            "Make sure AppConfig is attached to the chart instance."
+        )
+
+    if cfg.profile not in operational_profiles:
+        raise KeyError(
+            f"Operational profile {cfg.profile!r} was not found in chart."
+        )
+
+    profile_cfg = operational_profiles[cfg.profile]
+    profile = profile_cfg.to_runtime()
+
+    trend = TrendMode(cfg.trend)
+    humidity_ratio_evaluator = _resolve_humidity_ratio_evaluator(chart)
+
+    field = build_operational_zone_field(
+        chart_cfg=chart.cfg,
+        profile=profile,
+        load_class_name=cfg.load_class,
+        trend=trend,
+        itu_evaluator=_default_itu_evaluator,
+        humidity_ratio_evaluator=humidity_ratio_evaluator,
+        n_t=cfg.n_t,
+        n_rh=cfg.n_rh,
+    )
+
+    cmap, norm = _build_action_colormap(profile)
+
+    mesh = ax.pcolormesh(
+        field.T_grid,
+        field.W_grid,
+        field.action_grid,
+        cmap=cmap,
+        norm=norm,
+        shading="auto",
+        alpha=cfg.alpha,
+        zorder=cfg.zorder,
+    )
+
+    if cfg.show_boundaries:
+        ax.contour(
+            field.T_grid,
+            field.W_grid,
+            field.action_grid,
+            levels=np.arange(0.5, len(OperationalAction), 1.0),
+            colors=cfg.boundary_color,
+            linewidths=cfg.boundary_linewidth,
+            alpha=cfg.boundary_alpha,
+            zorder=cfg.zorder + 0.01,
+        )
+
+    if cfg.show_colorbar:
+        cbar = plt.colorbar(mesh, ax=ax, pad=0.02)
+        cbar.set_ticks(np.arange(len(OperationalAction)))
+        cbar.set_ticklabels(
+            [profile.action_styles[action].label for action in OperationalAction]
+        )
+        cbar.set_label(cfg.colorbar_label)
+
+    if cfg.show_legend:
+        handles = _legend_handles(profile)
+        ax.legend(
+            handles=handles,
+            title=cfg.label or "Ação operacional",
+            loc="best",
+        )

@@ -58,7 +58,7 @@ chart:
   # Output file settings
   # ---------------------------------------------------------------------------
   # File name of the exported chart and raster resolution in DPI.
-  output: psychchart_itu.png
+  output: temporal_overlay.png
   dpi: 200
 
 
