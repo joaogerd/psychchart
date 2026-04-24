@@ -16,16 +16,22 @@ from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.patches import Patch
 
 from psychchart.config.operations import OperationalOverlayConfig
+from psychchart.indexes.itu import ITU
 from psychchart.operations.enums import OperationalAction, TrendMode
 from psychchart.operations.zones import build_operational_zone_field
 from psychchart.psychrometrics import Psychrometrics
 
 
 def _default_itu_evaluator(T: np.ndarray, RH: np.ndarray) -> np.ndarray:
-    """Evaluate ITU on array inputs."""
-    from psychchart.indexes.domain.engine import evaluate_index
+    """
+    Evaluate ITU on array inputs.
 
-    return evaluate_index("ITU", T=T, RH=RH)
+    The operational layer uses the same ITU implementation registered in the
+    index system instead of importing an obsolete experimental domain-engine
+    module. This keeps operational overlays numerically aligned with the ITU
+    fields and isolines rendered elsewhere in the chart.
+    """
+    return ITU.compute_vectorized({"T": T, "RH": RH})
 
 
 def _wrap_humidity_ratio_candidate(
