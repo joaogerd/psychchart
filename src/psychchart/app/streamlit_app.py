@@ -85,6 +85,49 @@ def _build_report(data: dict, yaml_text: str) -> str:
     )
 
 
+def _compute_point_readout(T: float, RH_pct: float, pressure: float) -> dict[str, float]:
+    RH = RH_pct / 100.0
+    W = Psychrometrics.humidity_ratio(T, RH, pressure)
+    h = Psychrometrics.enthalpy(T, W)
+    Tdp = Psychrometrics.dew_point_temperature(RH, T)
+    itu = ITU.compute({"T": T, "RH": RH})
+    return {"T": T, "RH_pct": RH_pct, "RH": RH, "W": W, "h": h, "Tdp": Tdp, "ITU": itu}
+
+
+def _render_point_readout_sidebar(st, pressure: float) -> dict[str, float]:
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Point readout")
+    T = st.sidebar.number_input("Readout T (°C)", value=30.0, step=0.5, key="readout_t")
+    RH_pct = st.sidebar.number_input(
+        "Readout RH (%)",
+        value=70.0,
+        min_value=0.0,
+        max_value=100.0,
+        step=1.0,
+        key="readout_rh",
+    )
+    result = _compute_point_readout(T, RH_pct, pressure)
+    st.sidebar.metric("ITU", f"{result['ITU']:.1f}")
+    st.sidebar.caption(
+        f"W={result['W']:.5f} kg/kg | h={result['h']:.1f} kJ/kg | "
+        f"Tdp={result['Tdp']:.1f} °C"
+    )
+    return result
+
+
+def _render_point_readout_card(st, result: dict[str, float]) -> None:
+    st.subheader("Point readout")
+    cols = st.columns(4)
+    cols[0].metric("T", f"{result['T']:.1f} °C")
+    cols[1].metric("RH", f"{result['RH_pct']:.0f}%")
+    cols[2].metric("ITU", f"{result['ITU']:.1f}")
+    cols[3].metric("Dew point", f"{result['Tdp']:.1f} °C")
+    st.caption(
+        f"Humidity ratio: {result['W']:.5f} kg/kg dry air | "
+        f"Enthalpy: {result['h']:.1f} kJ/kg dry air"
+    )
+
+
 def _apply_controls(st, data: dict) -> dict:
     edited = dict(data)
     chart = dict(edited.get("chart", {}))
@@ -108,8 +151,7 @@ def _apply_controls(st, data: dict) -> dict:
             edited["zones"] = []
         if not st.checkbox("Data layers", value=bool(edited.get("data_layers"))):
             edited["data_layers"] = []
-        show_operational = st.checkbox("Operational overlay", value=bool(edited.get("operational_overlays")))
-        if not show_operational:
+        if not st.checkbox("Operational overlay", value=bool(edited.get("operational_overlays"))):
             edited["operational_overlays"] = []
 
     if edited.get("operational_overlays"):
@@ -128,12 +170,10 @@ def _apply_csv_import(st, data: dict) -> dict:
         uploaded_csv = st.file_uploader("Overlay CSV", type=["csv"], key="csv_overlay")
         if uploaded_csv is None:
             return data
-
         df = pd.read_csv(uploaded_csv)
         columns = list(df.columns)
         if not columns:
             return data
-
         t_col = st.selectbox("Temperature column", columns, index=0)
         rh_col = st.selectbox("RH column", columns, index=min(1, len(columns) - 1))
         time_options = ["<none>"] + columns
@@ -145,7 +185,6 @@ def _apply_csv_import(st, data: dict) -> dict:
 
     path = Path(tempfile.gettempdir()) / "psychchart_streamlit_overlay.csv"
     df.to_csv(path, index=False)
-
     layer: dict[str, Any] = {
         "data": str(path),
         "format": "csv",
@@ -153,13 +192,10 @@ def _apply_csv_import(st, data: dict) -> dict:
         "fields": [],
         "render": [],
     }
-
     if time_col != "<none>":
         layer["temporal"] = {"time_col": time_col, "sort": True}
-
     if value_col != "<none>":
         layer["fields"].append({"type": "direct_column", "name": "csv_value", "col": value_col})
-
     if render_mode == "path":
         layer["render"].append({"type": "path", "order_by": None if time_col == "<none>" else time_col, "color": "#264653", "linewidth": 2.0, "alpha": 0.9, "zorder": 60})
     elif render_mode == "classified_points" and value_col != "<none>":
@@ -170,12 +206,8 @@ def _apply_csv_import(st, data: dict) -> dict:
             render["value"] = "csv_value"
             render["colorbar"] = True
         layer["render"].append(render)
-
     edited = dict(data)
-    if replace_existing:
-        edited["data_layers"] = [layer]
-    else:
-        edited["data_layers"] = list(edited.get("data_layers", []) or []) + [layer]
+    edited["data_layers"] = [layer] if replace_existing else list(edited.get("data_layers", []) or []) + [layer]
     return edited
 
 
@@ -196,19 +228,6 @@ def _figure_bytes(fig, fmt: str, dpi: int = 180) -> bytes:
     return buffer.getvalue()
 
 
-def _point_readout(st, pressure: float) -> None:
-    with st.sidebar.expander("Point readout", expanded=True):
-        T = st.number_input("Readout T", value=30.0, step=0.5)
-        RH_pct = st.number_input("Readout RH (%)", value=70.0, min_value=0.0, max_value=100.0, step=1.0)
-        RH = RH_pct / 100.0
-        W = Psychrometrics.humidity_ratio(T, RH, pressure)
-        h = Psychrometrics.enthalpy(T, W)
-        Tdp = Psychrometrics.dew_point_temperature(RH, T)
-        itu = ITU.compute({"T": T, "RH": RH})
-        st.metric("ITU", f"{itu:.1f}")
-        st.caption(f"W={W:.5f} kg/kg | h={h:.1f} kJ/kg | Tdp={Tdp:.1f} C")
-
-
 def main() -> None:
     st = _require_streamlit()
     st.set_page_config(page_title="psychChart interactive", layout="wide")
@@ -226,12 +245,13 @@ def main() -> None:
     data = _apply_csv_import(st, data)
     yaml_text = _dump_yaml(data)
     report_text = _build_report(data, yaml_text)
-    _point_readout(st, float(data.get("chart", {}).get("pressure", 101325.0)))
+    point_readout = _render_point_readout_sidebar(st, float(data.get("chart", {}).get("pressure", 101325.0)))
 
     left, right = st.columns([0.60, 0.40], gap="large")
     with right:
+        _render_point_readout_card(st, point_readout)
         st.subheader("YAML source of truth")
-        yaml_text = st.text_area("Edit YAML", value=yaml_text, height=680)
+        yaml_text = st.text_area("Edit YAML", value=yaml_text, height=620)
         st.download_button("Download YAML", yaml_text.encode("utf-8"), "psychchart_interactive.yaml", "text/yaml")
         st.download_button("Download report", report_text.encode("utf-8"), "psychchart_report.md", "text/markdown")
     with left:
