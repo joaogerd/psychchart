@@ -141,7 +141,7 @@ temporal_overlays:
   - type: CTA_TRAJECTORY
 
     # Source dataset containing the temporal sequence.
-    data: data/animal_day.csv
+    data: examples/data/animal_day.csv
 
     # Column containing dry-bulb temperature values.
     t_col: temp
