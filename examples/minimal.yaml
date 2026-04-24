@@ -1,128 +1,22 @@
-# ============================================================================
-# PsychChart configuration file
-# ============================================================================
-#
-# This YAML file defines a minimal psychrometric chart configuration.
-# It is fully declarative and contains NO computation or plotting logic.
-#
-# The configuration is organized into logical sections:
-# - chart  : global physical and rendering parameters
-# - isos   : isoline (isopleth) definitions
-# - points : discrete psychrometric states (observations or design points)
-#
-# All quantities follow SI units unless explicitly stated otherwise.
-# ============================================================================
-
-
-# ----------------------------------------------------------------------------
-# Global chart configuration
-# ----------------------------------------------------------------------------
 chart:
-  # Minimum dry-bulb air temperature shown on the chart.
-  # Unit: degrees Celsius [°C]
   t_min: 20
-
-  # Maximum dry-bulb air temperature shown on the chart.
-  # Unit: degrees Celsius [°C]
   t_max: 40
-
-  # Atmospheric pressure assumed for all psychrometric computations.
-  # Unit: Pascals [Pa]
-  #
-  # Typical values:
-  # - 101325 : standard sea-level atmosphere
-  # - ~90000 : moderate altitude
-  #
-  # IMPORTANT:
-  # Pressure directly affects humidity ratio, enthalpy,
-  # and all derived psychrometric properties.
   pressure: 101325
-
-  # Output image file generated after rendering the chart.
-  # Supported formats depend on the Matplotlib backend (PNG, PDF, SVG, etc.).
-  output: psychchart_minimal.png
-
-  # Resolution of the output figure.
-  # Higher values improve print quality at the cost of file size.
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg)"
+  output: "psychchart_minimal.png"
   dpi: 150
 
-
-# ----------------------------------------------------------------------------
-# Isoline (isopleth) definitions
-# ----------------------------------------------------------------------------
-#
-# Each entry in this list defines a family of isolines to be computed
-# and rendered on the psychrometric chart.
-#
-# Isolines are derived from physical psychrometric relationships.
-# Styling options are purely visual.
-#
-isos:
-  - name: relative_humidity
-    # Identifier of the isoline family.
-    # Must correspond to a registered isoline type in the library.
-    #
-    # Common examples:
-    # - relative_humidity
-    # - humidity_ratio
-    # - enthalpy
-    # - wet_bulb_temperature
-
+isolines:
+  relative_humidity:
     enabled: true
-    # If false, this isoline family is ignored without removing it
-    # from the configuration.
-
     values: [0.3, 0.5, 0.7, 0.9]
-    # Numerical values defining each isoline.
-    #
-    # For relative humidity:
-    # - Values are FRACTIONS, not percentages.
-    #   0.3 -> 30%
-    #   0.9 -> 90%
-
     color: gray
-    # Line color (any Matplotlib-compatible color name or code).
+    linestyle: "--"
 
-    style: "--"
-    # Line style:
-    # "-"  : solid
-    # "--" : dashed
-    # ":"  : dotted
-    # "-." : dash-dot
-
-
-# ----------------------------------------------------------------------------
-# Discrete psychrometric points
-# ----------------------------------------------------------------------------
-#
-# Points represent specific psychrometric states, such as:
-# - field measurements
-# - simulation outputs
-# - design or comfort reference conditions
-# - physiological or behavioral observations
-#
 points:
-  - label: Example
-    # Text label associated with the point.
-    # Used in legends or annotations.
-
+  - label: "Example"
     t: 30
-    # Dry-bulb air temperature.
-    # Unit: degrees Celsius [°C]
-
     rh: 0.60
-    # Relative humidity.
-    # Unit: fraction (0–1), NOT percentage.
-    # 0.60 -> 60%
-
     marker: "o"
-    # Marker symbol following Matplotlib conventions.
-    # Examples:
-    # "o" : circle
-    # "s" : square
-    # "^" : triangle
-
     color: black
-    # Marker color
-
-

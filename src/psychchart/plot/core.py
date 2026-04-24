@@ -15,21 +15,24 @@ from psychchart.config import (
     IndexZone,
     PathConfig,
     DensityFieldConfig,
-    ObservationsConfig,
-    TemporalOverlayConfig
+    DataLayerConfig,
+    OperationalOverlayConfig,
+    OperationalProfileConfig,    
 )
 
+from psychchart.data.layer_builder import build_data_layer
 # Low-level drawing helpers (single responsibility)
 from .layers import ZORDER
+from .data_layers import draw_data_layers
+from .legend import draw_chart_legend
 from .isolines import draw_isolines
 from .zones import draw_zones
-from .density import draw_density_field
-from .observations import ObservationLayer
 from .indexes import (
     draw_indexes,
     draw_index_zones,
 )
-from .temporal import draw_temporal_overlays
+
+#from .operational_zones import draw_operational_zones
 
 # =============================================================================
 # Main rendering engine
@@ -175,15 +178,13 @@ class PsychChart:
     density_fields: Optional[List[DensityFieldConfig]] = None
 
     # ------------------------------------------------------------------
-    # Observational datasets (data-driven overlays)
+    # datasets (data-driven overlays)
     # ------------------------------------------------------------------
-    observations: Optional[List] = None
-
-    # ------------------------------------------------------------------
-    # Temporal overlays (time-aware trajectories / memory layers)
-    # ------------------------------------------------------------------
-    temporal_overlays: Optional[List[TemporalOverlayConfig]] = None
-
+    data_layers: Optional[List[DataLayerConfig]] = None
+    
+    operational_profiles: Optional[List[OperationalProfileConfig]] = None
+    operational_overlays: Optional[List[OperationalOverlayConfig]] = None
+    
     # ------------------------------------------------------------------
     # Post-initialization normalization
     # ------------------------------------------------------------------
@@ -199,8 +200,6 @@ class PsychChart:
         index-based rendering layers.
         """
 
-        from psychchart.psychrometrics import Psychrometrics
-
         self.isolines = self.isolines or {}
         self.zones = self.zones or []
         self.points = self.points or []
@@ -208,21 +207,24 @@ class PsychChart:
         self.index_zones = self.index_zones or []
         self.paths = self.paths or []
         self.density_fields = self.density_fields or []
-        self.observations = self.observations or []
-        self.temporal_overlays = self.temporal_overlays or []
+        self.density_fields = self.density_fields or []
         self.psych = Psychrometrics()
         
         # -------------------------------------------------------------
-        # Process observational datasets (declarative → executable)
+        # Process datasets (declarative → executable)
         # -------------------------------------------------------------
-        processed_observations = []
-        for obs_cfg in self.observations:
-            processed_observations.append(
-                build_observation_dataset(obs_cfg)
-            )
 
-        self.observations = processed_observations
+        self.data_layers = [
+            build_data_layer(layer_cfg, pressure=self.cfg.pressure)
+            for layer_cfg in self.data_layers
+        ]
 
+        # ---------------------------------------------------------
+        # App-level declarative sections live on the chart instance,
+        # not inside ChartConfig.
+        # ---------------------------------------------------------
+        self.operational_profiles = self.operational_profiles or {}
+        self.operational_overlays = self.operational_overlays or {}
         # Internal counter used for unique labeling of index zones
         self._index_zone_counter = 0
 
@@ -937,82 +939,7 @@ class PsychChart:
                     fontsize="small",
                     zorder=p.zorder,
                 )
-                
-    # ==================================================================
-    # Observational overlays
-    # ==================================================================
-    def _draw_observations(self):
-        """
-        Render all observational datasets and their associated DataIndexes.
-
-        This method iterates over the registered observational datasets
-        and renders each configured DataIndex as an independent
-        ObservationLayer.
-
-        Rendering Logic
-        ---------------
-        For each dataset in ``self.observations``:
-
-            1. Access its associated ``data_indexes`` configurations
-            2. Instantiate an ``ObservationLayer`` for each index
-            3. Delegate rendering to the layer
-
-        Conceptual Flow
-        ---------------
-        Dataset
-            └── FunctionalObservations
-                    ├── Thermodynamic states (T in °C, RH in fraction)
-                    ├── Precomputed index fields
-                    └── Utilities for projection
-
-            └── DataIndexConfig (one or more)
-                    └── Rendering parameters
-
-            → ObservationLayer
-                    → draw(ax, chart)
-
-        Responsibilities
-        ----------------
-        - Dispatch rendering of observational layers
-        - Preserve deterministic ordering
-        - Maintain separation between data and domain layers
-
-        Non-Responsibilities
-        --------------------
-        This method does NOT:
-
-        - Load files
-        - Normalize units
-        - Compute DataIndexes
-        - Aggregate statistics
-        - Modify the psychrometric domain
-        - Apply axis formatting
-        - Perform scientific computation
-
-        Architectural Guarantees
-        -------------------------
-        - Observational layers are independent from domain index fields.
-        - Each DataIndex is rendered as an isolated visual layer.
-        - Rendering order follows insertion order.
-        - No mutation of dataset or chart state occurs.
-
-        Notes
-        -----
-        - Multiple DataIndexes per dataset are supported.
-        - Overlapping layers stack according to iteration order.
-        - This method strictly delegates visualization; all
-          scientific computation must occur upstream.
-        """
-        for dataset in self.observations:
-            for idx_cfg in dataset.data_indexes:
-
-                layer = ObservationLayer(
-                    functional_obs=dataset.functional_obs,
-                    config=idx_cfg,
-                )
-
-                layer.draw(self.ax, self)
-                
+                                
     # ==================================================================
     # Main rendering pipeline
     # ==================================================================
@@ -1121,20 +1048,16 @@ class PsychChart:
         # ------------------------------------------------------------------
         # Background layers
         # ------------------------------------------------------------------
-        draw_density_field(self.ax, self)
+        #draw_density_field(self.ax, self)
         draw_indexes(self, self.ax)
         draw_index_zones(self, self.ax)
 
         # ------------------------------------------------------------------
-        # Temporal overlays
+        # Canonical data-driven layers
         # ------------------------------------------------------------------
-        draw_temporal_overlays(self, self.ax)
-
-        # ------------------------------------------------------------------
-        # Observational overlays
-        # ------------------------------------------------------------------
-        self._draw_observations()
-
+        auto_legend_handles = draw_data_layers(self, self.ax)
+        draw_chart_legend(self.ax, self.cfg, auto_legend_handles)
+        
         # ------------------------------------------------------------------
         # Physical boundaries
         # ------------------------------------------------------------------
@@ -1146,7 +1069,13 @@ class PsychChart:
         draw_zones(self.ax, self)
         draw_isolines(self.ax, self)
         self._draw_points()
-    
+
+        operational_overlays = getattr(self.cfg, "operational_overlays", None)
+        print(self.cfg)
+        if operational_overlays:
+            for overlay_cfg in operational_overlays:
+                draw_operational_zones(self.ax, self, overlay_cfg)
+
         # ------------------------------------------------------------------
         # Final formatting
         # ------------------------------------------------------------------

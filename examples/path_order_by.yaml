@@ -1,0 +1,27 @@
+chart:
+  t_min: 10
+  t_max: 45
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+  title: "Ordered path with explicit order_by"
+  output: "path_order_by.png"
+  dpi: 180
+
+data_layers:
+  - data: "data/animal_day.csv"
+    format: "csv"
+    projection:
+      t_col: temp
+      rh_col: rh
+      rh_unit: auto
+    temporal:
+      time_col: hour
+      sort: true
+    render:
+      - type: path
+        order_by: hour
+        color: "darkblue"
+        alpha: 0.95
+        linewidth: 2.4
+        zorder: 30

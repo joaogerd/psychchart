@@ -657,6 +657,8 @@ class Observations:
         - Density computation is performed using ``numpy.histogram2d``.
         - When ``cfg.normalize=True``, the returned values represent a
           probability density (integrates to 1 over the domain).
+          Then the returned histogram is the sample density, defined 
+          such that the sum over bins of the product bin_value * bin_area is 1.
         - When ``cfg.normalize=False``, the returned values represent
           raw observation counts per bin.
         - No clipping to the saturation curve is performed here; this

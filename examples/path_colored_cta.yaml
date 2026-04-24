@@ -1,0 +1,32 @@
+chart:
+  t_min: 10
+  t_max: 45
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+  title: "Path colored by accumulated thermal load"
+  output: "path_colored_cta.png"
+  dpi: 180
+
+data_layers:
+  - data: "data/animal_day.csv"
+    format: "csv"
+    projection:
+      t_col: temp
+      rh_col: rh
+      rh_unit: auto
+    temporal:
+      time_col: hour
+      sort: true
+    render:
+      - type: path
+        order_by: hour
+        color_by: cta_acumulada
+        cmap: inferno
+        vmin: 0.0
+        vmax: 10.0
+        alpha: 0.95
+        linewidth: 3.0
+        linestyle: "-"
+        label: "CTA trajectory"
+        zorder: 40

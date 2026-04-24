@@ -1,0 +1,55 @@
+chart:
+  t_min: 0
+  t_max: 40
+  y_min: 0.0
+  y_max: 0.030
+  pressure: 101325
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg)"
+  title: "Cattle Functional Comfort Analysis"
+  output: "icf_observations.png"
+  dpi: 180
+
+isolines:
+  relative_humidity:
+    enabled: true
+    values: [0.2, 0.4, 0.6, 0.8]
+    color: blue
+    labels: true
+
+  enthalpy:
+    enabled: false
+    values: [20, 40, 60, 80]
+    color: red
+    labels: true
+
+indexes:
+  - index: "ITU"
+    label: "ITU"
+    cmap: "inferno"
+    vmin: 60
+    vmax: 90
+    parameters:
+      animal: "dairy_cow"
+    render:
+      field:
+        alpha: 0.35
+        colorbar: true
+
+observations:
+  - file: "data/panting_zero.parquet"
+    format: "parquet"
+    data_indexes:
+      - index: "ICF"
+        scatter: true
+        scalar_field: false
+        bins: [40, 40]
+        cmap: "viridis"
+        alpha: 0.6
+        colorbar: true
+    density:
+      bins: [60, 60]
+      cmap: "magma"
+      alpha: 0.35
+      colorbar: true
+      normalize: true

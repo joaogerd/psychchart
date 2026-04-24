@@ -1,0 +1,159 @@
+# =============================================================================
+# Psychrometric chart – ITU full visualization
+# =============================================================================
+#
+# This configuration defines a full psychrometric chart with:
+#
+# 1. A psychrometric domain constrained in temperature (T) and humidity ratio (W)
+# 2. ITU isolines rendered as contour lines over the chart
+# 3. A Thermal Excess (TE) continuous field rendered as the background
+# 4. A temporal trajectory overlay representing the animal thermal path
+#    through the day, annotated by accumulated thermal load (CTA)
+#
+# The overall visual interpretation is:
+#
+# - the TE field shows instantaneous environmental thermal excess
+# - ITU isolines preserve classical threshold-based chart reading
+# - the temporal overlay shows how the animal moved through the
+#   psychrometric domain during the observation period
+#
+# This example is especially useful for:
+#
+# - thermal comfort studies
+# - cumulative heat-load analysis
+# - animal-environment trajectory visualization
+# - psychrometric storytelling with dynamic overlays
+# =============================================================================
+
+chart:
+  # ---------------------------------------------------------------------------
+  # Dry-bulb temperature range of the chart (x-axis)
+  # ---------------------------------------------------------------------------
+  # Defines the visible temperature domain in degrees Celsius.
+  t_min: 10
+  t_max: 45
+
+  # ---------------------------------------------------------------------------
+  # Reference pressure in pascals
+  # ---------------------------------------------------------------------------
+  # Psychrometric relationships depend on pressure, so this value is required
+  # for correct humidity-ratio calculations and chart geometry.
+  pressure: 101325
+
+  # ---------------------------------------------------------------------------
+  # Humidity-ratio limits of the chart (y-axis)
+  # ---------------------------------------------------------------------------
+  # These bounds define the visible range of the humidity ratio W.
+  # The unit is typically kg water vapor / kg dry air.
+  y_min: 0.0
+  y_max: 0.035
+
+  # ---------------------------------------------------------------------------
+  # Chart title
+  # ---------------------------------------------------------------------------
+  # Human-readable title shown in the final figure.
+  title: "Trajetória Térmica e Fadiga Acumulada"
+
+  # ---------------------------------------------------------------------------
+  # Output file settings
+  # ---------------------------------------------------------------------------
+  # File name of the exported chart and raster resolution in DPI.
+  output: temporal_overlay.png
+  dpi: 200
+
+
+# -----------------------------------------------------------------------------
+# Computed indexes
+# -----------------------------------------------------------------------------
+# This section configures computed psychrometric or thermal indexes to be
+# evaluated over the chart domain.
+#
+# In this example:
+#
+# - ITU is rendered as isolines
+# - TE  is rendered as a continuous scalar field
+#
+# The rendering strategy is defined inside the nested ``render`` section.
+# -----------------------------------------------------------------------------
+indexes:
+  # ---------------------------------------------------------------------------
+  # ITU isolines
+  # ---------------------------------------------------------------------------
+  # ITU is displayed as contour lines to preserve threshold readability and
+  # facilitate classical interpretation of thermal stress conditions.
+  - index: ITU
+
+    # Optional human-readable label associated with the index.
+    label: ITU
+
+    render:
+      isolines:
+        # Matplotlib line style for the ITU isolines.
+        style: ":"
+
+        # Fixed color for contour lines.
+        color: black
+
+        # Line width of the isolines.
+        linewidth: 1.5
+
+        # Whether inline contour labels should be displayed.
+        label: true
+
+  # ---------------------------------------------------------------------------
+  # Thermal Excess (TE) continuous field
+  # ---------------------------------------------------------------------------
+  # TE is rendered as a background scalar field.
+  # This is useful to show the instantaneous spatial structure of thermal
+  # excess over the psychrometric domain.
+  - index: TE
+
+    # Human-readable label for legends, colorbars, or annotations.
+    label: Thermal Excess
+
+    render:
+      field:
+        # Field opacity.
+        # A value of 1.0 means fully opaque background rendering.
+        alpha: 1.0
+
+        # Whether a colorbar should be shown for the scalar field.
+        colorbar: true
+
+
+# -----------------------------------------------------------------------------
+# Temporal overlays
+# -----------------------------------------------------------------------------
+# This section configures one or more ordered trajectories to be drawn over the
+# psychrometric chart.
+#
+# In this example, the trajectory comes from an external CSV file describing the
+# observed thermal path of an animal throughout the day.
+#
+# Expected conceptual interpretation:
+#
+# - each record corresponds to one observed state
+# - temperature and RH define the trajectory position
+# - hour defines temporal ordering
+# - CTA defines the cumulative thermal load associated with each point
+# -----------------------------------------------------------------------------
+temporal_overlays:
+  - type: CTA_TRAJECTORY
+
+    # Source dataset containing the temporal sequence.
+    data: data/animal_day.csv
+
+    # Column containing dry-bulb temperature values.
+    t_col: temp
+
+    # Column containing relative humidity values.
+    # Depending on the loader/model rules, these values may be given as
+    # fractions [0, 1] or percentages [0, 100].
+    rh_col: rh
+
+    # Column containing the time coordinate used to order the trajectory
+    # and, optionally, annotate each point.
+    time_col: hour
+
+    # Column containing cumulative thermal load or accumulated fatigue metric.
+    cta_col: cta_acumulada

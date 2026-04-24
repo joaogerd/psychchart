@@ -1,0 +1,32 @@
+chart:
+  t_min: 10
+  t_max: 45
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+  title: "Path with points"
+  output: "path_points.png"
+  dpi: 180
+
+data_layers:
+  - data: "data/animal_day.csv"
+    format: "csv"
+    projection:
+      t_col: temp
+      rh_col: rh
+      rh_unit: auto
+    temporal:
+      time_col: hour
+      sort: true
+    render:
+      - type: path
+        color: "black"
+        alpha: 0.75
+        linewidth: 1.8
+        zorder: 20
+
+      - type: points
+        color: "red"
+        size: 26
+        alpha: 0.90
+        zorder: 35

@@ -1,0 +1,53 @@
+chart:
+  t_min: 10
+  t_max: 45
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+  title: "Trajectory with CTA points and annotations"
+  output: "path_scatter_annotate_cta.png"
+  dpi: 180
+
+data_layers:
+  - data: "data/animal_day.csv"
+    format: "csv"
+    projection:
+      t_col: temp
+      rh_col: rh
+      rh_unit: auto
+    temporal:
+      time_col: hour
+      sort: true
+    fields:
+      - type: direct_column
+        name: CTA
+        col: cta_acumulada
+    render:
+      - type: path
+        order_by: hour
+        color: "black"
+        alpha: 0.70
+        linewidth: 1.8
+        zorder: 20
+
+      - type: scatter
+        value: CTA
+        cmap: viridis
+        size: 46
+        alpha: 1.0
+        edgecolor: black
+        edgewidth: 0.8
+        colorbar: true
+        zorder: 25
+
+      - type: annotate
+        every: 1
+        template: "{time}h\nCTA={value:.2f}"
+        time_field: hour
+        value_field: CTA
+        dx: 0.35
+        dy: 0.0005
+        fontsize: 8.0
+        fontweight: bold
+        color: black
+        zorder: 30

@@ -66,6 +66,7 @@ from typing import Any, Dict, Optional, Tuple
 from pydantic import Field
 
 from .base import StrictModel
+from .legend import LegendConfig
 
 
 class ChartConfig(StrictModel):
@@ -261,3 +262,9 @@ class ChartConfig(StrictModel):
     show_tw_grid: bool = True
     tw_grid: Dict[str, Any] = Field(default_factory=dict)
     tw_grid_style: Dict[str, Any] = Field(default_factory=dict)
+
+    # -------------------------------------------------------------------------
+    # Declarative legend
+    # -------------------------------------------------------------------------
+    # The legend is optional so simple charts do not need to define it.
+    legend: Optional[LegendConfig] = None

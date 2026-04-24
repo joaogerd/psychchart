@@ -1,207 +1,129 @@
-# =============================================================================
-# Example: Advanced psychrometric chart with animal comfort zones
-# =============================================================================
-# This file fully defines a psychrometric chart, including:
-# - physical domain
-# - psychrometric isolines
-# - thermal comfort zones
-# - reference points
-#
-# Conventions used throughout this file:
-# - Temperature in degrees Celsius (°C)
-# - Relative humidity as fraction (0–1) or percentage (0–100)
-# - Pressure in Pascals (Pa)
-# =============================================================================
-
-
 chart:
-  # ---------------------------------------------------------------------------
-  # Global chart parameters
-  # ---------------------------------------------------------------------------
-
   t_min: 0
-  # Minimum dry-bulb temperature shown on the x-axis (°C).
-  # Defines the left boundary of the chart.
-
   t_max: 50
-  # Maximum dry-bulb temperature shown on the x-axis (°C).
-  # Defines the right boundary of the chart.
-
   pressure: 101325
-  # Total atmospheric pressure (Pa).
-  # This value is used in ALL psychrometric calculations
-  # (humidity ratio, wet-bulb temperature, specific volume, etc.).
-
-  y_min: 0
-  # Lower bound of the y-axis (humidity ratio).
-  # Forces the chart to start exactly at the physical origin (W = 0).
-
-  y_max: 0.085
-  # Upper bound of the y-axis (humidity ratio).
-  # If omitted, the plotting engine will automatically compute
-  # a value slightly above the saturation curve at t_max.
-
-  output: carta.png
-  # Output filename for the generated chart image.
-
+  y_min: 0.0
+  y_max: 0.035
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg)"
+  title: "Psychrometric chart with cattle comfort zones"
+  output: "bovinos_racas.png"
   dpi: 200
-  # Output resolution (dots per inch).
-  # Higher values produce sharper images.
+  style: "seaborn-v0_8"
 
-  style: seaborn-v0_8
-  # Matplotlib style to be applied globally.
-  # Controls default colors, grid appearance, fonts, and spacing.
-
-
-# -----------------------------------------------------------------------------
-# Isolines (psychrometric isopleths)
-# -----------------------------------------------------------------------------
-isos:
-  # The key "isos" MUST be a list.
-  # Each list item defines a family of isolines.
-
-  - name: relative_humidity
-    # Internal identifier of the isoline type.
-    # Used by the plotting engine to select the correct equation.
-
+isolines:
+  relative_humidity:
     enabled: true
-    # Enables or disables the rendering of this isoline family.
-
     values: [0.2, 0.4, 0.6, 0.8]
-    # Relative humidity values.
-    # May be provided as fractions (0–1) or percentages (20–80).
-    # The loader normalizes these automatically.
-
     color: crimson
-    # Line color for relative humidity curves.
+    linestyle: "-"
+    linewidth: 1.0
 
-    style: "-"
-    # Line style (solid line).
-
-  - name: wet_bulb
-    # Wet-bulb temperature isolines.
-
+  wet_bulb:
     enabled: true
-    # Enables wet-bulb temperature curves.
-
     values: [10, 15, 20, 25, 30, 35]
-    # Wet-bulb temperatures (°C) at which isolines are drawn.
-
     color: goldenrod
-    # Line color for wet-bulb isolines.
+    linestyle: "--"
+    linewidth: 0.9
 
-    style: "--"
-    # Dashed line to visually distinguish from other isolines.
-
-  - name: moisture_quantity
-    # Constant humidity ratio (moisture content) isolines.
-
+  moisture_quantity:
     enabled: true
-    # Enables horizontal moisture content lines.
-
     values: [0.005, 0.010, 0.015, 0.020]
-    # Humidity ratio values (kg water vapor / kg dry air).
-
     color: forestgreen
-    # Line color for moisture content isolines.
+    linestyle: "-."
+    linewidth: 0.9
 
-    style: "-."
-    # Solid line style.
-
-  - name: enthalpy
-    # Moist air enthalpy isolines.
-
-    enabled: false
-    # Explicitly disabled in this example.
-    # Keeping it declared improves configuration readability.
-
-  - name: specific_volume
-    # Specific volume isolines.
-
-    enabled: false
-    # Disabled in this configuration.
-
-
-# -----------------------------------------------------------------------------
-# Zones (thermal comfort regions)
-# -----------------------------------------------------------------------------
 zones:
-  # Each list item defines a physical region in the psychrometric space.
-
-  - name: Taurinos
-    # Name of the zone.
-    # Displayed in the chart legend.
-
+  - name: "Taurinos"
     t_range: [15, 25]
-    # Dry-bulb temperature range (°C) defining the horizontal extent.
-
     rh_range: [0.40, 0.70]
-    # Relative humidity range (fraction 0–1).
-    # Defines the vertical extent of the zone.
-
     follow_rh: true
-    # If true, zone boundaries follow actual relative humidity curves,
-    # rather than forming a rectangular approximation.
-
     edgecolor: darkred
-    # Color of the zone boundary.
-
     facecolor: none
-    # No fill color (transparent zone interior).
-
     linewidth: 2.0
-    # Width of the zone boundary line.
+    alpha: 1.0
 
-  - name: Girolando
-    # Second comfort zone, representing a different breed or condition.
-
+  - name: "Girolando"
     t_range: [15, 28]
-    # Wider temperature tolerance.
-
     rh_range: [0.40, 0.75]
-    # Wider humidity tolerance.
-
     follow_rh: true
-    # Boundaries follow real RH curves.
-
     edgecolor: magenta
-    # Zone boundary color.
-
     facecolor: none
-    # Transparent interior.
-
     linewidth: 2.0
-    # Boundary line width.
-    #
-index_fields:
-  - index: ITU
-    cmap: inferno
-    alpha: 0.4
-    colorbar: true
-      
-indexes:
-  - name: ITU
-    mode: isolines
-    levels: [68, 72, 76, 80]
-    style: "-"
-    color: black
-# -----------------------------------------------------------------------------
-# Reference points
-# -----------------------------------------------------------------------------
+    alpha: 1.0
+
 points:
-  - label: Sample_A
-    # Text label shown next to the point.
-
+  - label: "Sample_A"
     t: 32
-    # Dry-bulb temperature of the point (°C).
-
     rh: 0.55
-    # Relative humidity of the point.
-    # Can be provided as fraction (0.55) or percentage (55).
-
     marker: "o"
-    # Matplotlib marker symbol.
-
     color: black
-    # Marker and label color.
 
+indexes:
+  - index: "ITU"
+    label: "ITU"
+    cmap: "inferno"
+    vmin: 60
+    vmax: 90
+    render:
+      field:
+        alpha: 0.35
+        colorbar: true
+      isolines:
+        levels: [68, 72, 76, 80]
+        color: black
+        style: "-"
+        linewidth: 1.1
+        label: true
+data_layers:
+  - data: "data/animal_day.csv"
+    format: "csv"
+
+    projection:
+      t_col: temp
+      rh_col: rh
+      rh_unit: auto
+
+    temporal:
+      time_col: hour
+      sort: true
+
+    fields:
+      - type: direct_column
+        name: CTA
+        col: cta_acumulada
+
+    render:
+      - type: path
+        order_by: hour
+        color_by: CTA
+        cmap: viridis
+        vmin: 0.0
+        vmax: 30.0
+        alpha: 0.85
+        linewidth: 2.0
+        linestyle: "-"
+        label: "Trajetória temporal"
+        zorder: 20
+
+      - type: scatter
+        value: CTA
+        cmap: viridis
+        size: 52
+        alpha: 1.0
+        edgecolor: black
+        edgewidth: 0.8
+        colorbar: false
+        zorder: 25
+
+      - type: annotate
+        every: 3
+        template: "{time:.1f}h\n(CTA:{value:.0f})"
+        time_field: hour
+        value_field: CTA
+        dx: 0.35
+        dy: 0.0005
+        fontsize: 8.0
+        fontweight: bold
+        color: black
+        zorder: 30
