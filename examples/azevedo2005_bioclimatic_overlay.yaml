@@ -1,0 +1,239 @@
+# -----------------------------------------------------------------------------
+# Azevedo et al. (2005) — bovine bioclimatic overlay
+# -----------------------------------------------------------------------------
+# This example combines three layers:
+#
+# 1. ITU/THI background bands, following conventional thermal-stress classes
+#    and the critical Holstein-Zebu thresholds reported by Azevedo et al. (2005).
+# 2. Critical ITU isolines for the genetic groups evaluated in the article.
+# 3. Experimental T x RH envelopes from Table 1 of the article, drawn as
+#    labeled RH-following geometric zones.
+#
+# The environmental envelopes are descriptive ranges observed in the experiment.
+# They are not, by themselves, comfort zones. The physiological interpretation is
+# carried by the ITU thresholds and isolines.
+# -----------------------------------------------------------------------------
+
+chart:
+  t_min: 10
+  t_max: 45
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg dry air)"
+  title: "Bovine bioclimatic overlay — Azevedo et al. (2005)"
+  output: "azevedo2005_bioclimatic_overlay.png"
+  dpi: 200
+  style: null
+  grid: true
+  figsize: [16, 9]
+
+  show_tw_grid: true
+  tw_grid:
+    vertical: true
+    horizontal: true
+    every:
+      T: 5.0
+      W: 0.005
+
+  tw_grid_style:
+    color: "#8a8a8a"
+    linewidth: 0.45
+    linestyle: "-"
+    alpha: 0.28
+
+isolines:
+  relative_humidity:
+    enabled: true
+    values: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    color: "#7A4A58"
+    linestyle: "-"
+    linewidth: 0.65
+    alpha: 0.55
+    labels: true
+    label_fontsize: 7
+    label_fmt: "{value:.0%}"
+
+  enthalpy:
+    enabled: false
+    values: [20, 40, 60, 80, 100]
+    color: "#355C7D"
+    linestyle: "-."
+    linewidth: 0.9
+    alpha: 0.70
+    labels: false
+    label_fontsize: 8
+    label_fmt: null
+
+  wet_bulb:
+    enabled: false
+    values: [10, 15, 20, 25, 30, 35]
+    color: "#B8860B"
+    linestyle: "--"
+    linewidth: 0.9
+    alpha: 0.75
+    labels: false
+    label_fontsize: 8
+    label_fmt: null
+
+# -----------------------------------------------------------------------------
+# ITU field and critical ITU isolines
+# -----------------------------------------------------------------------------
+indexes:
+  - index: ITU
+    label: "Temperature-Humidity Index (ITU)"
+    levels: [60, 72, 76, 77, 79, 84, 89, 98]
+    cmap: "Spectral_r"
+    vmin: 60
+    vmax: 98
+    render:
+      field:
+        alpha: 0.56
+        colorbar: true
+
+  - index: ITU
+    label: "Critical ITU thresholds"
+    levels: [72, 76, 77, 79, 84, 89]
+    render:
+      isolines:
+        levels: [72, 76, 77, 79, 84, 89]
+        style: "-"
+        color: "#111111"
+        linewidth: 1.15
+        alpha: 0.95
+        label: true
+        label_fontsize: 8
+        label_fmt: "ITU {value:.0f}"
+
+# -----------------------------------------------------------------------------
+# Semantic ITU bands
+# -----------------------------------------------------------------------------
+index_zones:
+  - index: ITU
+    name: "ITU < 72 — no heat stress"
+    range: [60, 72]
+    color: "#5DADE2"
+    alpha: 0.18
+
+  - index: ITU
+    name: "72–76 — mild heat stress / attention"
+    range: [72, 76]
+    color: "#7DCEA0"
+    alpha: 0.18
+
+  - index: ITU
+    name: "76–77 — critical onset for 7/8 HZ"
+    range: [76, 77]
+    color: "#F7DC6F"
+    alpha: 0.22
+
+  - index: ITU
+    name: "77–79 — critical onset for 3/4 HZ"
+    range: [77, 79]
+    color: "#F5B041"
+    alpha: 0.22
+
+  - index: ITU
+    name: "79–89 — critical onset for 1/2 HZ / moderate stress"
+    range: [79, 89]
+    color: "#EC7063"
+    alpha: 0.20
+
+  - index: ITU
+    name: "ITU >= 89 — severe heat stress"
+    range: [89, 98]
+    color: "#AF7AC5"
+    alpha: 0.20
+
+# -----------------------------------------------------------------------------
+# Experimental environmental envelopes from Table 1
+# -----------------------------------------------------------------------------
+# Ranges are T x RH envelopes:
+#   Winter morning:   T = 10–25 °C, RH = 48–100%
+#   Winter afternoon: T = 18–31 °C, RH = 26–90%
+#   Summer morning:   T = 18–29 °C, RH = 52–100%
+#   Summer afternoon: T = 21–34 °C, RH = 33–100%
+#   Total envelope:   T = 10–34 °C, RH = 26–100%
+# -----------------------------------------------------------------------------
+zones:
+  - name: "Experimental envelope"
+    t_range: [10, 34]
+    rh_range: [26, 100]
+    follow_rh: true
+    edgecolor: "#1F1F1F"
+    facecolor: "none"
+    linewidth: 2.8
+    alpha: 0.0
+    show_label: true
+    label: "Experimental envelope\n10–34 °C | RH 26–100%"
+    label_t: 16.5
+    label_rh: 92
+    label_color: "#1F1F1F"
+    label_fontsize: 9
+    label_rotation: 0
+
+  - name: "Winter morning"
+    t_range: [10, 25]
+    rh_range: [48, 100]
+    follow_rh: true
+    edgecolor: "#1F77B4"
+    facecolor: "#D6EAF8"
+    linewidth: 2.0
+    alpha: 0.13
+    show_label: true
+    label: "Winter\nmorning"
+    label_t: 16.0
+    label_rh: 70
+    label_color: "#1F77B4"
+    label_fontsize: 9
+
+  - name: "Winter afternoon"
+    t_range: [18, 31]
+    rh_range: [26, 90]
+    follow_rh: true
+    edgecolor: "#2E7D32"
+    facecolor: "#D5F5E3"
+    linewidth: 2.0
+    alpha: 0.13
+    show_label: true
+    label: "Winter\nafternoon"
+    label_t: 25.0
+    label_rh: 38
+    label_color: "#2E7D32"
+    label_fontsize: 9
+
+  - name: "Summer morning"
+    t_range: [18, 29]
+    rh_range: [52, 100]
+    follow_rh: true
+    edgecolor: "#B7950B"
+    facecolor: "#FCF3CF"
+    linewidth: 2.2
+    alpha: 0.15
+    show_label: true
+    label: "Summer\nmorning"
+    label_t: 22.5
+    label_rh: 86
+    label_color: "#8A6D00"
+    label_fontsize: 9
+
+  - name: "Summer afternoon"
+    t_range: [21, 34]
+    rh_range: [33, 100]
+    follow_rh: true
+    edgecolor: "#C0392B"
+    facecolor: "#FADBD8"
+    linewidth: 2.4
+    alpha: 0.15
+    show_label: true
+    label: "Summer\nafternoon"
+    label_t: 30.0
+    label_rh: 48
+    label_color: "#922B21"
+    label_fontsize: 9
+
+points: []
+observations: []
+temporal_overlays: []
