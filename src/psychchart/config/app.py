@@ -31,7 +31,12 @@ from .overlays import TemporalOverlayConfig
 from .points import Point
 from .zones import Zone, IndexZone
 from .isolines import IsoSet
-from .operations import OperationalOverlayConfig, OperationalProfileConfig
+from .operations import (
+    DEFAULT_DAIRY_OPERATIONAL_PROFILE_NAME,
+    OperationalOverlayConfig,
+    OperationalProfileConfig,
+    default_dairy_operational_profile,
+)
 
 
 # =============================================================================
@@ -199,6 +204,41 @@ def _temporal_to_data_layer(overlay: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _inject_default_operational_profile(data: Dict[str, Any]) -> None:
+    """
+    Inject the built-in dairy operational profile when it is referenced.
+
+    The operational layer is designed to be declarative, but most examples and
+    routine use cases should not need to repeat the full default dairy cooling
+    policy. When an overlay references ``dairy_cooling_default`` and the profile
+    is not explicitly provided, this helper inserts a validated default mapping
+    before Pydantic model validation.
+    """
+    overlays = data.get("operational_overlays") or []
+    if not overlays:
+        return
+
+    if not isinstance(overlays, list):
+        raise TypeError("'operational_overlays' must be a list when provided")
+
+    profiles = data.get("operational_profiles") or {}
+    if not isinstance(profiles, dict):
+        raise TypeError("'operational_profiles' must be a mapping/dict when provided")
+
+    default_needed = False
+    for overlay in overlays:
+        if not isinstance(overlay, dict):
+            raise TypeError("Each operational overlay must be a mapping/dict")
+        profile_name = overlay.get("profile", DEFAULT_DAIRY_OPERATIONAL_PROFILE_NAME)
+        if profile_name == DEFAULT_DAIRY_OPERATIONAL_PROFILE_NAME:
+            default_needed = True
+
+    if default_needed and DEFAULT_DAIRY_OPERATIONAL_PROFILE_NAME not in profiles:
+        profiles = dict(profiles)
+        profiles[DEFAULT_DAIRY_OPERATIONAL_PROFILE_NAME] = default_dairy_operational_profile()
+        data["operational_profiles"] = profiles
+
+
 class AppConfig(StrictModel):
     """
     Root validated application configuration for ``psychchart``.
@@ -221,12 +261,8 @@ class AppConfig(StrictModel):
     observations: List[ObservationsConfig] = Field(default_factory=list)
     temporal_overlays: List[TemporalOverlayConfig] = Field(default_factory=list)
 
-    operational_profiles: dict[str, OperationalProfileConfig] = Field(
-        default_factory=dict
-    )
-    operational_overlays: list[OperationalOverlayConfig] = Field(
-        default_factory=list
-    )
+    operational_profiles: dict[str, OperationalProfileConfig] = Field(default_factory=dict)
+    operational_overlays: list[OperationalOverlayConfig] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
@@ -236,6 +272,8 @@ class AppConfig(StrictModel):
         """
         if not isinstance(data, dict):
             raise TypeError("Top-level configuration must be a mapping/dict")
+
+        _inject_default_operational_profile(data)
 
         raw_isolines = data.get("isolines", {})
 
@@ -248,9 +286,7 @@ class AppConfig(StrictModel):
 
                 name = item.get("name")
                 if not name:
-                    raise ValueError(
-                        "Each legacy isoline entry must define 'name'"
-                    )
+                    raise ValueError("Each legacy isoline entry must define 'name'")
 
                 normalized[name] = dict(item)
 
@@ -334,22 +370,16 @@ class AppConfig(StrictModel):
 
             for item in raw_observations:
                 if not isinstance(item, dict):
-                    raise TypeError(
-                        "Each observation entry must be a mapping/dict"
-                    )
+                    raise TypeError("Each observation entry must be a mapping/dict")
                 synthesized_layers.append(_observation_to_data_layer(item))
 
             raw_temporal = data.get("temporal_overlays", []) or []
             if not isinstance(raw_temporal, list):
-                raise TypeError(
-                    "'temporal_overlays' must be a list when provided"
-                )
+                raise TypeError("'temporal_overlays' must be a list when provided")
 
             for item in raw_temporal:
                 if not isinstance(item, dict):
-                    raise TypeError(
-                        "Each temporal overlay entry must be a mapping/dict"
-                    )
+                    raise TypeError("Each temporal overlay entry must be a mapping/dict")
                 synthesized_layers.append(_temporal_to_data_layer(item))
 
             data["data_layers"] = synthesized_layers
@@ -395,8 +425,7 @@ class AppConfig(StrictModel):
         for overlay in self.operational_overlays:
             if overlay.profile not in self.operational_profiles:
                 raise ValueError(
-                    f"Operational overlay references unknown profile "
-                    f"{overlay.profile!r}."
+                    f"Operational overlay references unknown profile {overlay.profile!r}."
                 )
 
             profile_cfg = self.operational_profiles[overlay.profile]
