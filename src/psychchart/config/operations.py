@@ -9,12 +9,64 @@ calculation, and rendering.
 
 from __future__ import annotations
 
-from typing import Literal
+from copy import deepcopy
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 ActionCode = Literal["O0", "O1", "O2", "O3", "O4", "O5"]
 TrendCode = Literal["falling", "steady", "rising"]
+
+DEFAULT_DAIRY_OPERATIONAL_PROFILE_NAME = "dairy_cooling_default"
+
+DEFAULT_DAIRY_OPERATIONAL_PROFILE: dict[str, Any] = {
+    "name": DEFAULT_DAIRY_OPERATIONAL_PROFILE_NAME,
+    "itu_classes": [
+        {"name": "I0", "min": None, "max": 72.0},
+        {"name": "I1", "min": 72.0, "max": 78.0},
+        {"name": "I2", "min": 78.0, "max": 84.0},
+        {"name": "I3", "min": 84.0, "max": 90.0},
+        {"name": "I4", "min": 90.0, "max": None},
+    ],
+    "humidity_classes": [
+        {"name": "H0", "min": 0.00, "max": 0.60},
+        {"name": "H1", "min": 0.60, "max": 0.75},
+        {"name": "H2", "min": 0.75, "max": 1.01},
+    ],
+    "load_classes": [
+        {"name": "A0", "min": 0.000, "max": 0.005, "floor_action": "O0", "representative": 0.0025},
+        {"name": "A1", "min": 0.005, "max": 0.010, "floor_action": "O1", "representative": 0.0075},
+        {"name": "A2", "min": 0.010, "max": 0.015, "floor_action": "O2", "representative": 0.0125},
+        {"name": "A3", "min": 0.015, "max": 0.025, "floor_action": "O3", "representative": 0.0200},
+        {"name": "A4", "min": 0.025, "max": None, "floor_action": "O5", "representative": 0.0300},
+    ],
+    "base_matrix": {
+        "I0": {"H0": "O0", "H1": "O0", "H2": "O0"},
+        "I1": {"H0": "O1", "H1": "O2", "H2": "O3"},
+        "I2": {"H0": "O2", "H1": "O3", "H2": "O4"},
+        "I3": {"H0": "O3", "H1": "O4", "H2": "O4"},
+        "I4": {"H0": "O5", "H1": "O5", "H2": "O5"},
+    },
+    "action_styles": {
+        "O0": {"label": "Monitoramento", "facecolor": "#d9f0d3"},
+        "O1": {"label": "Ventilação básica", "facecolor": "#78c679"},
+        "O2": {"label": "Ventilação reforçada", "facecolor": "#ffd92f"},
+        "O3": {"label": "Ventilação + aspersão", "facecolor": "#fdae61"},
+        "O4": {"label": "Resfriamento máximo", "facecolor": "#f46d43"},
+        "O5": {"label": "Emergência", "facecolor": "#d73027"},
+    },
+    "modifiers": {
+        "high_temp_humidity": {"temp_ge": 30.0, "rh_ge": 0.75, "add_levels": 1},
+        "high_temp_itu": {"temp_ge": 30.0, "itu_ge": 84.0, "add_levels": 1},
+        "rising_load": {"dca_dt_gt": 0.001, "add_levels": 1},
+        "recovery": {"dca_dt_lt": -0.001, "ca_lt": 0.010, "itu_lt": 78.0, "add_levels": -1},
+    },
+}
+
+
+def default_dairy_operational_profile() -> dict[str, Any]:
+    """Return an isolated copy of the default dairy cooling profile mapping."""
+    return deepcopy(DEFAULT_DAIRY_OPERATIONAL_PROFILE)
 
 
 class IntervalClassConfig(BaseModel):
@@ -122,9 +174,7 @@ class OperationalProfileConfig(BaseModel):
     load_classes: list[AccumulatedLoadClassConfig]
     base_matrix: dict[str, dict[str, ActionCode]]
     action_styles: dict[ActionCode, OperationalActionStyleConfig]
-    modifiers: OperationalModifiersConfig = Field(
-        default_factory=OperationalModifiersConfig
-    )
+    modifiers: OperationalModifiersConfig = Field(default_factory=OperationalModifiersConfig)
 
     @model_validator(mode="after")
     def validate_matrix_and_styles(self) -> "OperationalProfileConfig":
@@ -151,9 +201,7 @@ class OperationalProfileConfig(BaseModel):
 
         expected_actions = {"O0", "O1", "O2", "O3", "O4", "O5"}
         if set(self.action_styles.keys()) != expected_actions:
-            raise ValueError(
-                "action_styles must define exactly O0, O1, O2, O3, O4, O5."
-            )
+            raise ValueError("action_styles must define exactly O0, O1, O2, O3, O4, O5.")
 
         return self
 
@@ -173,7 +221,7 @@ class OperationalOverlayConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    profile: str
+    profile: str = DEFAULT_DAIRY_OPERATIONAL_PROFILE_NAME
     load_class: str
     trend: TrendCode = "steady"
 
