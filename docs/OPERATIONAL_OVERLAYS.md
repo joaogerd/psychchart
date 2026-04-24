@@ -35,6 +35,25 @@ operational_overlays:
 The profile defines the policy. The overlay projects one representative state
 of that policy onto the psychrometric chart.
 
+## Built-in dairy profile
+
+psychChart includes a built-in profile named `dairy_cooling_default`.
+
+For routine examples, the full profile does not need to be repeated. When an
+operational overlay omits `profile`, psychChart uses this default profile:
+
+```yaml
+operational_overlays:
+  - load_class: A2
+    trend: steady
+    alpha: 0.18
+    zorder: 0.55
+    show_boundaries: true
+```
+
+Define `operational_profiles` explicitly only when a custom management policy
+is needed.
+
 ## Profiles
 
 An operational profile contains:
