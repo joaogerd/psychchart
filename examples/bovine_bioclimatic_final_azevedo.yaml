@@ -1,0 +1,300 @@
+# -----------------------------------------------------------------------------
+# Final bovine bioclimatic chart prototype
+# -----------------------------------------------------------------------------
+# This example is the first complete Givoni-like bovine chart prototype for
+# psychChart.
+#
+# It combines:
+#   1. physical psychrometric chart structure;
+#   2. ITU background field and ITU stress bands;
+#   3. critical ITU isolines from Azevedo et al. (2005);
+#   4. T x RH experimental envelopes from Azevedo et al. (2005);
+#   5. a sample temporal trajectory classified by accumulated thermal load;
+#   6. a declarative legend for the accumulated-load classes.
+#
+# Scientific reading:
+#   - ITU colors and isolines represent physiological thermal-risk structure.
+#   - T x RH envelopes represent environmental ranges observed in the article.
+#   - Classified points represent an example monitored trajectory with
+#     accumulated thermal-load state.
+#   - Operational cooling recommendations are intentionally not hard-coded here;
+#     they belong to the future operational overlay layer.
+# -----------------------------------------------------------------------------
+
+chart:
+  t_min: 10
+  t_max: 45
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg dry air)"
+  title: "Bovine bioclimatic chart — ITU, Azevedo et al. (2005), and accumulated load"
+  output: "bovine_bioclimatic_final_azevedo.png"
+  dpi: 220
+  style: null
+  grid: true
+  figsize: [16, 9]
+
+  show_tw_grid: true
+  tw_grid:
+    vertical: true
+    horizontal: true
+    every:
+      T: 5.0
+      W: 0.005
+
+  tw_grid_style:
+    color: "#8a8a8a"
+    linewidth: 0.45
+    linestyle: "-"
+    alpha: 0.25
+
+  legend:
+    show: true
+    loc: "upper left"
+    title: "Accumulated thermal-load state"
+    frameon: true
+    fancybox: true
+    framealpha: 0.94
+    borderpad: 0.8
+    labelspacing: 0.55
+    handlelength: 2.2
+    handletextpad: 0.8
+    borderaxespad: 0.8
+    fontsize: 8.5
+    title_fontsize: 9.5
+    entries:
+      - type: classes_from_profile
+        profile: CTA
+
+isolines:
+  relative_humidity:
+    enabled: true
+    values: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    color: "#6E3F4D"
+    linestyle: "-"
+    linewidth: 0.62
+    alpha: 0.50
+    labels: true
+    label_fontsize: 7
+    label_fmt: "{value:.0%}"
+
+  enthalpy:
+    enabled: false
+    values: [20, 40, 60, 80, 100]
+    color: "#355C7D"
+    linestyle: "-."
+    linewidth: 0.9
+    alpha: 0.70
+    labels: false
+    label_fontsize: 8
+    label_fmt: null
+
+  wet_bulb:
+    enabled: false
+    values: [10, 15, 20, 25, 30, 35]
+    color: "#B8860B"
+    linestyle: "--"
+    linewidth: 0.9
+    alpha: 0.75
+    labels: false
+    label_fontsize: 8
+    label_fmt: null
+
+indexes:
+  - index: ITU
+    label: "Temperature-Humidity Index (ITU)"
+    levels: [60, 72, 76, 77, 79, 84, 89, 98]
+    cmap: "Spectral_r"
+    vmin: 60
+    vmax: 98
+    render:
+      field:
+        alpha: 0.48
+        colorbar: true
+
+  - index: ITU
+    label: "Critical ITU thresholds"
+    levels: [72, 76, 77, 79, 84, 89]
+    render:
+      isolines:
+        levels: [72, 76, 77, 79, 84, 89]
+        style: "-"
+        color: "#111111"
+        linewidth: 1.10
+        alpha: 0.92
+        label: true
+        label_fontsize: 8
+        label_fmt: "ITU {value:.0f}"
+
+index_zones:
+  - index: ITU
+    name: "ITU < 72 — conventional no heat stress"
+    range: [60, 72]
+    color: "#5DADE2"
+    alpha: 0.14
+
+  - index: ITU
+    name: "72–76 — attention / mild heat stress"
+    range: [72, 76]
+    color: "#7DCEA0"
+    alpha: 0.14
+
+  - index: ITU
+    name: "76–77 — critical onset for 7/8 HZ"
+    range: [76, 77]
+    color: "#F7DC6F"
+    alpha: 0.18
+
+  - index: ITU
+    name: "77–79 — critical onset for 3/4 HZ"
+    range: [77, 79]
+    color: "#F5B041"
+    alpha: 0.18
+
+  - index: ITU
+    name: "79–89 — critical onset for 1/2 HZ / moderate stress"
+    range: [79, 89]
+    color: "#EC7063"
+    alpha: 0.16
+
+  - index: ITU
+    name: "ITU >= 89 — severe heat stress"
+    range: [89, 98]
+    color: "#AF7AC5"
+    alpha: 0.16
+
+zones:
+  - name: "Experimental envelope"
+    t_range: [10, 34]
+    rh_range: [26, 100]
+    follow_rh: true
+    edgecolor: "#1F1F1F"
+    facecolor: "none"
+    linewidth: 2.8
+    alpha: 0.0
+    show_label: true
+    label: "Experimental envelope\n10–34 °C | RH 26–100%"
+    label_t: 16.5
+    label_rh: 92
+    label_color: "#1F1F1F"
+    label_fontsize: 8.8
+    label_rotation: 0
+
+  - name: "Winter morning"
+    t_range: [10, 25]
+    rh_range: [48, 100]
+    follow_rh: true
+    edgecolor: "#1F77B4"
+    facecolor: "#D6EAF8"
+    linewidth: 1.9
+    alpha: 0.10
+    show_label: true
+    label: "Winter\nmorning"
+    label_t: 16.0
+    label_rh: 70
+    label_color: "#1F77B4"
+    label_fontsize: 8.5
+
+  - name: "Winter afternoon"
+    t_range: [18, 31]
+    rh_range: [26, 90]
+    follow_rh: true
+    edgecolor: "#2E7D32"
+    facecolor: "#D5F5E3"
+    linewidth: 1.9
+    alpha: 0.10
+    show_label: true
+    label: "Winter\nafternoon"
+    label_t: 25.0
+    label_rh: 38
+    label_color: "#2E7D32"
+    label_fontsize: 8.5
+
+  - name: "Summer morning"
+    t_range: [18, 29]
+    rh_range: [52, 100]
+    follow_rh: true
+    edgecolor: "#B7950B"
+    facecolor: "#FCF3CF"
+    linewidth: 2.1
+    alpha: 0.12
+    show_label: true
+    label: "Summer\nmorning"
+    label_t: 22.5
+    label_rh: 86
+    label_color: "#8A6D00"
+    label_fontsize: 8.5
+
+  - name: "Summer afternoon"
+    t_range: [21, 34]
+    rh_range: [33, 100]
+    follow_rh: true
+    edgecolor: "#C0392B"
+    facecolor: "#FADBD8"
+    linewidth: 2.3
+    alpha: 0.12
+    show_label: true
+    label: "Summer\nafternoon"
+    label_t: 30.0
+    label_rh: 48
+    label_color: "#922B21"
+    label_fontsize: 8.5
+
+data_layers:
+  - data: "examples/data/animal_day.csv"
+    format: "csv"
+
+    projection:
+      t_col: temp
+      rh_col: rh
+      rh_unit: auto
+
+    temporal:
+      time_col: hour
+      sort: true
+
+    fields:
+      - type: direct_column
+        name: CTA
+        col: cta_acumulada
+
+    render:
+      - type: path
+        order_by: hour
+        color: "#264653"
+        alpha: 0.88
+        linewidth: 2.3
+        linestyle: "-"
+        label: "Thermal trajectory"
+        zorder: 42
+
+      - type: classified_points
+        value_col: CTA
+        profile: CTA
+        order_by: hour
+        size: 56
+        alpha: 1.0
+        edgecolor: "#111111"
+        edgewidth: 0.75
+        marker: "o"
+        label: "Hourly accumulated-load state"
+        zorder: 45
+
+      - type: annotate
+        every: 2
+        template: "{time:.0f}h"
+        time_field: hour
+        value_field: CTA
+        dx: 0.035
+        dy: 0.00055
+        fontsize: 7.8
+        fontweight: bold
+        color: "#111111"
+        zorder: 50
+
+points: []
+observations: []
+temporal_overlays: []
