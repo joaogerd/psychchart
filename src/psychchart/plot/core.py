@@ -1071,7 +1071,6 @@ class PsychChart:
         self._draw_points()
 
         operational_overlays = getattr(self.cfg, "operational_overlays", None)
-        print(self.cfg)
         if operational_overlays:
             for overlay_cfg in operational_overlays:
                 draw_operational_zones(self.ax, self, overlay_cfg)
