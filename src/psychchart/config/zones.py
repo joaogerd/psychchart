@@ -68,8 +68,9 @@ class Zone(StrictModel):
         useful. Values may be fractions or percentages.
     label_color : str, optional
         Text color. Defaults to ``edgecolor`` when omitted.
-    label_fontsize : int, default=9
-        Label font size.
+    label_fontsize : float, default=9.0
+        Label font size. Fractional values are allowed because Matplotlib text
+        sizes accept floating-point values.
     label_rotation : float, default=0.0
         Label rotation in degrees.
     label_bbox : dict, optional
@@ -92,7 +93,7 @@ class Zone(StrictModel):
     label_t: Optional[float] = None
     label_rh: Optional[float] = None
     label_color: Optional[str] = None
-    label_fontsize: int = 9
+    label_fontsize: float = 9.0
     label_rotation: float = 0.0
     label_bbox: Optional[Dict[str, Any]] = None
 
