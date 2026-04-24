@@ -9,7 +9,7 @@ chart:
   dpi: 180
 
 data_layers:
-  - data: "data/animal_day.csv"
+  - data: "examples/data/animal_day.csv"
     format: "csv"
     projection:
       t_col: temp

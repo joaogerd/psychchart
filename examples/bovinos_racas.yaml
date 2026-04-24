@@ -76,7 +76,7 @@ indexes:
         linewidth: 1.1
         label: true
 data_layers:
-  - data: "data/animal_day.csv"
+  - data: "examples/data/animal_day.csv"
     format: "csv"
 
     projection:

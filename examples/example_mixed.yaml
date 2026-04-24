@@ -11,7 +11,7 @@ chart:
   output: "out_mixed.png"
 
 data_layers:
-  - data: "data/observations.csv"
+  - data: "examples/data/observations.csv"
     format: csv
     projection:
       t_col: T

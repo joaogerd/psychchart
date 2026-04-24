@@ -11,7 +11,7 @@ chart:
   output: "out_path_scatter_annotate.png"
 
 data_layers:
-  - data: "data/animal_day.csv"
+  - data: "examples/data/animal_day.csv"
     format: csv
     projection:
       t_col: temp
