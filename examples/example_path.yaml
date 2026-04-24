@@ -1,0 +1,33 @@
+chart:
+  t_min: 10
+  t_max: 40
+  y_min: 0.0
+  y_max: 0.030
+  pressure: 101325
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg)"
+  dpi: 150
+  title: "Data layer - path"
+  output: "out_path.png"
+
+data_layers:
+  - data: "data/animal_day.csv"
+    format: csv
+    projection:
+      t_col: temp
+      rh_col: rh
+      rh_unit: fraction
+    temporal:
+      time_col: hour
+      sort: true
+    fields:
+      - type: direct_column
+        name: CTA
+        col: cta_acumulada
+    render:
+      - type: path
+        order_by: hour
+        color: black
+        alpha: 0.8
+        linewidth: 1.5
+        zorder: 20
