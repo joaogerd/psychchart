@@ -73,6 +73,7 @@ def _build_report(data: dict, yaml_text: str) -> str:
             f"- Zones/envelopes: {_layer_count(data, 'zones')}",
             f"- Data layers: {_layer_count(data, 'data_layers')}",
             f"- Operational overlays: {_layer_count(data, 'operational_overlays')}",
+            f"- Reference points: {_layer_count(data, 'points')}",
             "",
             "## Reproducibility note",
             "This report was generated from the YAML configuration below. The YAML is the source of truth for the chart.",
@@ -94,25 +95,26 @@ def _compute_point_readout(T: float, RH_pct: float, pressure: float) -> dict[str
     return {"T": T, "RH_pct": RH_pct, "RH": RH, "W": W, "h": h, "Tdp": Tdp, "ITU": itu}
 
 
-def _render_point_readout_sidebar(st, pressure: float) -> dict[str, float]:
+def _render_point_readout_sidebar(st, pressure: float) -> tuple[dict[str, float], bool]:
     st.sidebar.markdown("---")
     st.sidebar.subheader("Point readout")
     T = st.sidebar.number_input("Readout T (°C)", value=30.0, step=0.5, key="readout_t")
     RH_pct = st.sidebar.number_input(
         "Readout RH (%)",
-        value=70.0,
+        value=50.0,
         min_value=0.0,
         max_value=100.0,
         step=1.0,
         key="readout_rh",
     )
+    show_on_chart = st.sidebar.checkbox("Show readout point on chart", value=True)
     result = _compute_point_readout(T, RH_pct, pressure)
     st.sidebar.metric("ITU", f"{result['ITU']:.1f}")
     st.sidebar.caption(
         f"W={result['W']:.5f} kg/kg | h={result['h']:.1f} kJ/kg | "
         f"Tdp={result['Tdp']:.1f} °C"
     )
-    return result
+    return result, show_on_chart
 
 
 def _render_point_readout_card(st, result: dict[str, float]) -> None:
@@ -126,6 +128,30 @@ def _render_point_readout_card(st, result: dict[str, float]) -> None:
         f"Humidity ratio: {result['W']:.5f} kg/kg dry air | "
         f"Enthalpy: {result['h']:.1f} kJ/kg dry air"
     )
+
+
+def _inject_readout_point(data: dict, result: dict[str, float], enabled: bool) -> dict:
+    edited = dict(data)
+    points = []
+    for item in list(edited.get("points", []) or []):
+        if not str(item.get("label", "")).startswith("Readout:"):
+            points.append(item)
+    if enabled:
+        points.append(
+            {
+                "t": float(result["T"]),
+                "rh": float(result["RH"]),
+                "label": f"Readout: T={result['T']:.1f} °C | RH={result['RH_pct']:.0f}% | ITU={result['ITU']:.1f}",
+                "marker": "X",
+                "color": "#000000",
+                "size": 95.0,
+                "alpha": 1.0,
+                "zorder": 95,
+                "show_label": True,
+            }
+        )
+    edited["points"] = points
+    return edited
 
 
 def _apply_controls(st, data: dict) -> dict:
@@ -243,9 +269,10 @@ def main() -> None:
 
     data = _apply_controls(st, _load_yaml(st.session_state.yaml_text))
     data = _apply_csv_import(st, data)
+    point_readout, show_readout_point = _render_point_readout_sidebar(st, float(data.get("chart", {}).get("pressure", 101325.0)))
+    data = _inject_readout_point(data, point_readout, show_readout_point)
     yaml_text = _dump_yaml(data)
     report_text = _build_report(data, yaml_text)
-    point_readout = _render_point_readout_sidebar(st, float(data.get("chart", {}).get("pressure", 101325.0)))
 
     left, right = st.columns([0.60, 0.40], gap="large")
     with right:
