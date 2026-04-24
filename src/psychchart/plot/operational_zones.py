@@ -18,6 +18,7 @@ from matplotlib.patches import Patch
 from psychchart.config.operations import OperationalOverlayConfig
 from psychchart.operations.enums import OperationalAction, TrendMode
 from psychchart.operations.zones import build_operational_zone_field
+from psychchart.psychrometrics import Psychrometrics
 
 
 def _default_itu_evaluator(T: np.ndarray, RH: np.ndarray) -> np.ndarray:
@@ -27,12 +28,45 @@ def _default_itu_evaluator(T: np.ndarray, RH: np.ndarray) -> np.ndarray:
     return evaluate_index("ITU", T=T, RH=RH)
 
 
+def _wrap_humidity_ratio_candidate(
+    candidate: Callable,
+    pressure: float,
+) -> Callable[[np.ndarray, np.ndarray], np.ndarray]:
+    """
+    Wrap supported humidity-ratio call signatures into ``f(T, RH)``.
+
+    Psychrometric helper names are not fully standardized across older
+    psychChart versions. This wrapper keeps the operational layer independent
+    of those historical naming differences while preserving one canonical
+    runtime signature for the gridded operational-field builder.
+    """
+
+    def evaluator(T: np.ndarray, RH: np.ndarray) -> np.ndarray:
+        try:
+            return candidate(T, RH, pressure)
+        except TypeError:
+            return candidate(T, RH)
+
+    return evaluator
+
+
 def _resolve_humidity_ratio_evaluator(
     chart,
 ) -> Callable[[np.ndarray, np.ndarray], np.ndarray]:
     """
     Resolve a humidity-ratio evaluator from the live chart object.
+
+    The operational-zone builder expects a callable with signature
+    ``f(T, RH) -> W``. The current psychrometric core exposes the canonical
+    method ``Psychrometrics.humidity_ratio(T, RH, P)``. Older experimental
+    versions used names such as ``humidity_ratio_from_rh`` or ``w_from_t_rh``.
+
+    This resolver first searches for historical aliases on the chart instance
+    and then falls back to the canonical static method using ``chart.cfg``
+    pressure. This makes operational overlays work with the current public
+    psychrometric API and preserves compatibility with older branches.
     """
+    pressure = getattr(getattr(chart, "cfg", None), "pressure", 101325.0)
     candidates = []
 
     psychro = getattr(chart, "psychrometrics", None)
@@ -42,30 +76,31 @@ def _resolve_humidity_ratio_evaluator(
                 getattr(psychro, "humidity_ratio_from_rh", None),
                 getattr(psychro, "get_humidity_ratio_from_rh", None),
                 getattr(psychro, "w_from_t_rh", None),
+                getattr(psychro, "humidity_ratio", None),
             ]
         )
 
-    chart_psychro = getattr(chart, "psychro", None)
+    chart_psychro = getattr(chart, "psych", None)
     if chart_psychro is not None:
         candidates.extend(
             [
                 getattr(chart_psychro, "humidity_ratio_from_rh", None),
                 getattr(chart_psychro, "get_humidity_ratio_from_rh", None),
                 getattr(chart_psychro, "w_from_t_rh", None),
+                getattr(chart_psychro, "humidity_ratio", None),
             ]
         )
 
+    candidates.append(Psychrometrics.humidity_ratio)
+
     for candidate in candidates:
         if callable(candidate):
-            return candidate
+            return _wrap_humidity_ratio_candidate(candidate, pressure)
 
     raise AttributeError(
         "Could not resolve a humidity-ratio evaluator from chart. "
-        "Expected one of: "
-        "'chart.psychrometrics.humidity_ratio_from_rh', "
-        "'chart.psychrometrics.get_humidity_ratio_from_rh', "
-        "'chart.psychrometrics.w_from_t_rh', "
-        "or equivalent under 'chart.psychro'."
+        "Expected a callable equivalent to "
+        "Psychrometrics.humidity_ratio(T, RH, pressure)."
     )
 
 
