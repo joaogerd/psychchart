@@ -40,11 +40,6 @@ def _wrap_humidity_ratio_candidate(
 ) -> Callable[[np.ndarray, np.ndarray], np.ndarray]:
     """
     Wrap supported humidity-ratio call signatures into ``f(T, RH)``.
-
-    Psychrometric helper names are not fully standardized across older
-    psychChart versions. This wrapper keeps the operational layer independent
-    of those historical naming differences while preserving one canonical
-    runtime signature for the gridded operational-field builder.
     """
 
     def evaluator(T: np.ndarray, RH: np.ndarray) -> np.ndarray:
@@ -66,11 +61,6 @@ def _resolve_humidity_ratio_evaluator(
     ``f(T, RH) -> W``. The current psychrometric core exposes the canonical
     method ``Psychrometrics.humidity_ratio(T, RH, P)``. Older experimental
     versions used names such as ``humidity_ratio_from_rh`` or ``w_from_t_rh``.
-
-    This resolver first searches for historical aliases on the chart instance
-    and then falls back to the canonical static method using ``chart.cfg``
-    pressure. This makes operational overlays work with the current public
-    psychrometric API and preserves compatibility with older branches.
     """
     pressure = getattr(getattr(chart, "cfg", None), "pressure", 101325.0)
     candidates = []
@@ -115,8 +105,9 @@ def _build_action_colormap(profile):
     ordered_actions = list(OperationalAction)
     colors = [profile.action_styles[action].facecolor for action in ordered_actions]
     cmap = ListedColormap(colors)
-    norm = BoundaryNorm(np.arange(-0.5, len(ordered_actions) + 0.5, 1.0), cmap.N)
-    return cmap, norm
+    levels = np.arange(-0.5, len(ordered_actions) + 0.5, 1.0)
+    norm = BoundaryNorm(levels, cmap.N)
+    return cmap, norm, levels
 
 
 def _legend_handles(profile):
@@ -133,6 +124,35 @@ def _legend_handles(profile):
             )
         )
     return handles
+
+
+def _draw_operational_field(
+    ax: Axes,
+    field,
+    cmap: ListedColormap,
+    norm: BoundaryNorm,
+    levels: np.ndarray,
+    cfg: OperationalOverlayConfig,
+):
+    """
+    Draw the categorical operational field as clean filled contours.
+
+    ``contourf`` is used instead of ``pcolormesh`` because operational actions
+    are categorical decisions, not a continuous scalar surface. This avoids the
+    fine raster-like texture that appears when dense categorical grids are drawn
+    as thousands of individual quadrilateral cells.
+    """
+    return ax.contourf(
+        field.T_grid,
+        field.W_grid,
+        field.action_grid,
+        levels=levels,
+        cmap=cmap,
+        norm=norm,
+        alpha=cfg.alpha,
+        antialiased=True,
+        zorder=cfg.zorder,
+    )
 
 
 def draw_operational_zones(
@@ -172,17 +192,15 @@ def draw_operational_zones(
         n_rh=cfg.n_rh,
     )
 
-    cmap, norm = _build_action_colormap(profile)
+    cmap, norm, levels = _build_action_colormap(profile)
 
-    mesh = ax.pcolormesh(
-        field.T_grid,
-        field.W_grid,
-        field.action_grid,
+    artist = _draw_operational_field(
+        ax=ax,
+        field=field,
         cmap=cmap,
         norm=norm,
-        shading="auto",
-        alpha=cfg.alpha,
-        zorder=cfg.zorder,
+        levels=levels,
+        cfg=cfg,
     )
 
     if cfg.show_boundaries:
@@ -198,7 +216,7 @@ def draw_operational_zones(
         )
 
     if cfg.show_colorbar:
-        cbar = plt.colorbar(mesh, ax=ax, pad=0.02)
+        cbar = plt.colorbar(artist, ax=ax, pad=0.02)
         cbar.set_ticks(np.arange(len(OperationalAction)))
         cbar.set_ticklabels(
             [profile.action_styles[action].label for action in OperationalAction]
