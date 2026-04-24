@@ -37,6 +37,27 @@ def action_from_value(value: str | int | OperationalAction) -> OperationalAction
     raise ValueError(f"Invalid operational action: {value!r}")
 
 
+def _optional_modifier(mapping: Mapping[str, Any], key: str) -> dict[str, Any] | None:
+    """
+    Return an optional modifier mapping only when it is actually configured.
+
+    Pydantic's ``model_dump()`` keeps optional fields with ``None`` values by
+    default. Therefore a runtime mapping may contain keys such as
+    ``"high_temp_itu": None``. Checking only ``key in mapping`` is not enough,
+    because unpacking ``None`` with ``**None`` raises ``TypeError``. This helper
+    treats both missing keys and explicit ``None`` values as disabled modifiers.
+    """
+    value = mapping.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise TypeError(
+            f"Operational modifier {key!r} must be a mapping or None, "
+            f"got {type(value).__name__}."
+        )
+    return dict(value)
+
+
 @dataclass(frozen=True)
 class IntervalClass:
     """
@@ -187,7 +208,7 @@ class OperationalProfile:
         for item in self.itu_classes:
             if item.contains(itu):
                 return item
-        raise ValueError(f"ITU value خارج profile domain: {itu}")
+        raise ValueError(f"ITU value outside profile domain: {itu}")
 
     def find_humidity_class(self, rh: float) -> HumidityClass:
         """Return the RH class containing `rh`."""
@@ -288,26 +309,44 @@ class OperationalProfile:
             for action_code, style in data["action_styles"].items()
         }
 
-        mods_cfg = data.get("modifiers", {})
+        mods_cfg = data.get("modifiers") or {}
+
+        high_temp_humidity_cfg = _optional_modifier(
+            mods_cfg,
+            "high_temp_humidity",
+        )
+        high_temp_itu_cfg = _optional_modifier(
+            mods_cfg,
+            "high_temp_itu",
+        )
+        rising_load_cfg = _optional_modifier(
+            mods_cfg,
+            "rising_load",
+        )
+        recovery_cfg = _optional_modifier(
+            mods_cfg,
+            "recovery",
+        )
+
         modifiers = OperationalModifiers(
             high_temp_humidity=(
-                HighTempHumidityModifier(**mods_cfg["high_temp_humidity"])
-                if "high_temp_humidity" in mods_cfg
+                HighTempHumidityModifier(**high_temp_humidity_cfg)
+                if high_temp_humidity_cfg is not None
                 else None
             ),
             high_temp_itu=(
-                HighTempITUModifier(**mods_cfg["high_temp_itu"])
-                if "high_temp_itu" in mods_cfg
+                HighTempITUModifier(**high_temp_itu_cfg)
+                if high_temp_itu_cfg is not None
                 else None
             ),
             rising_load=(
-                RisingLoadModifier(**mods_cfg["rising_load"])
-                if "rising_load" in mods_cfg
+                RisingLoadModifier(**rising_load_cfg)
+                if rising_load_cfg is not None
                 else None
             ),
             recovery=(
-                RecoveryModifier(**mods_cfg["recovery"])
-                if "recovery" in mods_cfg
+                RecoveryModifier(**recovery_cfg)
+                if recovery_cfg is not None
                 else None
             ),
         )
