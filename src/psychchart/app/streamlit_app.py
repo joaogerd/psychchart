@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import pandas as pd
 import yaml
 
 from psychchart import PsychChart, load_chart_config
@@ -80,6 +81,58 @@ def _apply_controls(st, data: dict) -> dict:
     return edited
 
 
+def _apply_csv_import(st, data: dict) -> dict:
+    st.sidebar.subheader("CSV data import")
+    uploaded_csv = st.sidebar.file_uploader("Overlay CSV", type=["csv"], key="csv_overlay")
+    if uploaded_csv is None:
+        return data
+
+    df = pd.read_csv(uploaded_csv)
+    columns = list(df.columns)
+    if not columns:
+        return data
+
+    t_col = st.sidebar.selectbox("Temperature column", columns, index=0)
+    rh_col = st.sidebar.selectbox("RH column", columns, index=min(1, len(columns) - 1))
+    time_options = ["<none>"] + columns
+    time_col = st.sidebar.selectbox("Time/order column", time_options, index=0)
+    value_options = ["<none>"] + columns
+    value_col = st.sidebar.selectbox("Class/value column", value_options, index=0)
+    render_mode = st.sidebar.selectbox("CSV render", ["scatter", "path", "classified_points"], index=0)
+
+    path = Path(tempfile.gettempdir()) / "psychchart_streamlit_overlay.csv"
+    df.to_csv(path, index=False)
+
+    layer = {
+        "data": str(path),
+        "format": "csv",
+        "projection": {"t_col": t_col, "rh_col": rh_col, "rh_unit": "auto"},
+        "fields": [],
+        "render": [],
+    }
+
+    if time_col != "<none>":
+        layer["temporal"] = {"time_col": time_col, "sort": True}
+
+    if value_col != "<none>":
+        layer["fields"].append({"type": "direct_column", "name": "csv_value", "col": value_col})
+
+    if render_mode == "path":
+        layer["render"].append({"type": "path", "order_by": None if time_col == "<none>" else time_col, "color": "#264653", "linewidth": 2.0, "alpha": 0.9, "zorder": 60})
+    elif render_mode == "classified_points" and value_col != "<none>":
+        layer["render"].append({"type": "classified_points", "value_col": "csv_value", "profile": "CTA", "size": 42, "alpha": 0.9, "edgecolor": "black", "edgewidth": 0.4, "zorder": 65})
+    else:
+        render = {"type": "scatter", "size": 26, "alpha": 0.75, "edgecolor": "black", "edgewidth": 0.3, "zorder": 65}
+        if value_col != "<none>":
+            render["value"] = "csv_value"
+            render["colorbar"] = True
+        layer["render"].append(render)
+
+    edited = dict(data)
+    edited["data_layers"] = [layer]
+    return edited
+
+
 def _render(yaml_text: str):
     with tempfile.TemporaryDirectory() as tmpdir:
         path = Path(tmpdir) / "interactive.yaml"
@@ -124,6 +177,7 @@ def main() -> None:
         st.session_state.yaml_text = text
 
     data = _apply_controls(st, _load_yaml(st.session_state.yaml_text))
+    data = _apply_csv_import(st, data)
     yaml_text = _dump_yaml(data)
     _point_readout(st, float(data.get("chart", {}).get("pressure", 101325.0)))
 
