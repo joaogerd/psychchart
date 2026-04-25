@@ -4,6 +4,8 @@ from psychchart.app.streamlit_app import (
     _dump_yaml,
     _inject_readout_point,
     _load_yaml,
+    _restore_or_hide_relative_humidity,
+    _restore_or_hide_section,
     _select_template_yaml,
 )
 from psychchart.app.templates import TEMPLATES
@@ -103,6 +105,78 @@ def test_template_selection_reset_restores_current_template():
 
     assert selected == TEMPLATES[template_name]
     assert st.session_state.yaml_text == TEMPLATES[template_name]
+
+
+def test_layer_manager_hides_and_restores_list_section_from_cache():
+    """Layer manager toggles must not destroy list-based layer sections."""
+    st = FakeStreamlit()
+    data = {"zones": [{"name": "custom", "t_range": [10, 20], "rh_range": [40, 80]}]}
+
+    hidden = _restore_or_hide_section(
+        st,
+        data,
+        section="zones",
+        enabled=False,
+        template_name="Minimal ITU chart",
+        fallback=[],
+    )
+    restored = _restore_or_hide_section(
+        st,
+        hidden,
+        section="zones",
+        enabled=True,
+        template_name="Minimal ITU chart",
+        fallback=[],
+    )
+
+    assert hidden["zones"] == []
+    assert restored["zones"] == data["zones"]
+
+
+def test_layer_manager_restores_template_section_when_cache_is_empty():
+    """Layer manager toggles should restore template content when no cache exists."""
+    st = FakeStreamlit()
+    data = {"indexes": []}
+
+    restored = _restore_or_hide_section(
+        st,
+        data,
+        section="indexes",
+        enabled=True,
+        template_name="Minimal ITU chart",
+        fallback=[],
+    )
+
+    assert restored["indexes"] == _load_yaml(TEMPLATES["Minimal ITU chart"])["indexes"]
+
+
+def test_layer_manager_hides_and_restores_relative_humidity():
+    """Relative-humidity isolines must be toggled non-destructively."""
+    st = FakeStreamlit()
+    data = {
+        "isolines": {
+            "relative_humidity": {
+                "enabled": True,
+                "values": [0.5, 1.0],
+            }
+        }
+    }
+
+    hidden = _restore_or_hide_relative_humidity(
+        st,
+        data,
+        enabled=False,
+        template_name="Minimal ITU chart",
+    )
+    restored = _restore_or_hide_relative_humidity(
+        st,
+        hidden,
+        enabled=True,
+        template_name="Minimal ITU chart",
+    )
+
+    assert "relative_humidity" not in hidden["isolines"]
+    assert restored["isolines"]["relative_humidity"] == data["isolines"]["relative_humidity"]
 
 
 def test_point_readout_injection_adds_single_reference_point():
