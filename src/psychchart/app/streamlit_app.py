@@ -16,6 +16,14 @@ from psychchart.app.templates import TEMPLATES
 from psychchart.indexes.itu import ITU
 from psychchart.psychrometrics import Psychrometrics
 
+DEFAULT_OPERATIONAL_OVERLAY: dict[str, Any] = {
+    "load_class": "A2",
+    "trend": "steady",
+    "alpha": 0.18,
+    "zorder": 0.55,
+    "show_boundaries": True,
+}
+
 
 def _require_streamlit():
     try:
@@ -154,6 +162,16 @@ def _inject_readout_point(data: dict, result: dict[str, float], enabled: bool) -
     return edited
 
 
+def _ensure_operational_overlay(data: dict) -> dict:
+    """Ensure one default operational overlay exists when the UI toggle is enabled."""
+    edited = dict(data)
+    overlays = list(edited.get("operational_overlays", []) or [])
+    if not overlays:
+        overlays = [dict(DEFAULT_OPERATIONAL_OVERLAY)]
+    edited["operational_overlays"] = overlays
+    return edited
+
+
 def _apply_controls(st, data: dict) -> dict:
     edited = dict(data)
     chart = dict(edited.get("chart", {}))
@@ -177,15 +195,25 @@ def _apply_controls(st, data: dict) -> dict:
             edited["zones"] = []
         if not st.checkbox("Data layers", value=bool(edited.get("data_layers"))):
             edited["data_layers"] = []
-        if not st.checkbox("Operational overlay", value=bool(edited.get("operational_overlays"))):
+
+        show_operational = st.checkbox(
+            "Management layer",
+            value=bool(edited.get("operational_overlays")),
+            help="Draw the operational cooling-management overlay.",
+        )
+        if show_operational:
+            edited = _ensure_operational_overlay(edited)
+        else:
             edited["operational_overlays"] = []
 
     if edited.get("operational_overlays"):
-        with st.sidebar.expander("Operational state", expanded=True):
+        with st.sidebar.expander("Management state", expanded=True):
             overlay = dict(edited["operational_overlays"][0])
-            overlay["load_class"] = st.selectbox("Load class", ["A0", "A1", "A2", "A3", "A4"], index=2)
-            overlay["trend"] = st.selectbox("Trend", ["falling", "steady", "rising"], index=1)
-            overlay["alpha"] = st.slider("Operational alpha", 0.0, 0.7, float(overlay.get("alpha", 0.18)), 0.01)
+            overlay["load_class"] = st.selectbox("Load class", ["A0", "A1", "A2", "A3", "A4"], index=["A0", "A1", "A2", "A3", "A4"].index(overlay.get("load_class", "A2")))
+            overlay["trend"] = st.selectbox("Trend", ["falling", "steady", "rising"], index=["falling", "steady", "rising"].index(overlay.get("trend", "steady")))
+            overlay["alpha"] = st.slider("Management alpha", 0.0, 0.7, float(overlay.get("alpha", 0.18)), 0.01)
+            overlay["zorder"] = st.slider("Management z-order", 0.0, 10.0, float(overlay.get("zorder", 0.55)), 0.05)
+            overlay["show_boundaries"] = st.checkbox("Show management boundaries", value=bool(overlay.get("show_boundaries", True)))
             edited["operational_overlays"] = [overlay]
 
     return edited
