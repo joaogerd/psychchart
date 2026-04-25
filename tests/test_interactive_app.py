@@ -4,8 +4,40 @@ from psychchart.app.streamlit_app import (
     _dump_yaml,
     _inject_readout_point,
     _load_yaml,
+    _select_template_yaml,
 )
 from psychchart.app.templates import TEMPLATES
+
+
+class FakeSessionState(dict):
+    """Small dict-like stand-in for Streamlit session_state."""
+
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError as exc:
+            raise AttributeError(name) from exc
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
+
+class FakeSidebar:
+    """Small stand-in for st.sidebar used by template-selection tests."""
+
+    def __init__(self, button_value=False):
+        self.button_value = button_value
+
+    def button(self, _label):
+        return self.button_value
+
+
+class FakeStreamlit:
+    """Minimal Streamlit facade for pure unit tests."""
+
+    def __init__(self, button_value=False):
+        self.session_state = FakeSessionState()
+        self.sidebar = FakeSidebar(button_value=button_value)
 
 
 def test_interactive_app_yaml_helpers_roundtrip():
@@ -31,6 +63,46 @@ def test_interactive_templates_are_valid_configs(tmp_path):
         assert "cfg" in data
         assert data["cfg"].t_min < data["cfg"].t_max
         assert data["cfg"].pressure > 0
+
+
+def test_template_selection_refreshes_when_template_changes():
+    """Changing the sidebar template must refresh the active YAML automatically."""
+    st = FakeStreamlit()
+    names = list(TEMPLATES)
+    first_template = names[0]
+    second_template = names[1]
+
+    first_yaml = _select_template_yaml(st, first_template, uploaded_text=None)
+    second_yaml = _select_template_yaml(st, second_template, uploaded_text=None)
+
+    assert first_yaml == TEMPLATES[first_template]
+    assert second_yaml == TEMPLATES[second_template]
+    assert st.session_state.active_template == second_template
+
+
+def test_template_selection_prefers_uploaded_yaml():
+    """An uploaded YAML document must override the active template."""
+    st = FakeStreamlit()
+    uploaded = "chart:\n  t_min: 1\n  t_max: 2\n"
+
+    selected = _select_template_yaml(st, list(TEMPLATES)[0], uploaded_text=uploaded)
+
+    assert selected == uploaded
+    assert st.session_state.yaml_text == uploaded
+    assert st.session_state.active_template is None
+
+
+def test_template_selection_reset_restores_current_template():
+    """The reset button must restore the currently selected template."""
+    st = FakeStreamlit(button_value=True)
+    template_name = list(TEMPLATES)[0]
+    st.session_state.yaml_text = "chart:\n  t_min: 99\n  t_max: 100\n"
+    st.session_state.active_template = template_name
+
+    selected = _select_template_yaml(st, template_name, uploaded_text=None)
+
+    assert selected == TEMPLATES[template_name]
+    assert st.session_state.yaml_text == TEMPLATES[template_name]
 
 
 def test_point_readout_injection_adds_single_reference_point():
