@@ -1,4 +1,8 @@
-"""Built-in YAML templates for the optional interactive app."""
+"""Built-in YAML templates for the optional interactive app.
+
+All templates intentionally use the same chart geometry so switching templates
+in the interactive app does not resize or visually jump the preview area.
+"""
 
 from __future__ import annotations
 
@@ -16,6 +20,7 @@ chart:
   title: "Interactive bovine bioclimatic chart"
   output: "interactive_bovine_bioclimatic.png"
   dpi: 180
+  style: null
   grid: true
   figsize: [14, 8]
   show_tw_grid: true
@@ -37,6 +42,11 @@ chart:
     frameon: true
     fancybox: true
     framealpha: 0.88
+    borderpad: 0.65
+    labelspacing: 0.45
+    handlelength: 2.0
+    handletextpad: 0.7
+    borderaxespad: 0.75
     fontsize: 8.5
     title_fontsize: 9.5
     entries:
@@ -223,26 +233,85 @@ chart:
   y_min: 0.0
   y_max: 0.035
   pressure: 101325
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg dry air)"
   title: "Interactive psychrometric chart"
   output: "interactive_psychchart.png"
   dpi: 180
+  style: null
+  grid: true
+  figsize: [14, 8]
+  show_tw_grid: true
+  tw_grid:
+    vertical: true
+    horizontal: true
+    every:
+      T: 5.0
+      W: 0.005
+  tw_grid_style:
+    color: "#8a8a8a"
+    linewidth: 0.45
+    linestyle: "-"
+    alpha: 0.22
+  legend:
+    show: false
+    loc: "upper left"
+    title: null
+    frameon: true
+    fancybox: true
+    framealpha: 0.88
+    borderpad: 0.65
+    labelspacing: 0.45
+    handlelength: 2.0
+    handletextpad: 0.7
+    borderaxespad: 0.75
+    fontsize: 8.5
+    title_fontsize: 9.5
+    entries: []
 
 isolines:
   relative_humidity:
     enabled: true
-    values: [0.1, 0.2, 0.4, 0.6, 0.8, 1.0]
+    values: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    color: "#6E3F4D"
+    linestyle: "-"
+    linewidth: 0.62
+    alpha: 0.46
     labels: true
+    label_fontsize: 7
     label_fmt: "{value:.0%}"
 
 indexes:
   - index: ITU
-    label: ITU
-    levels: [60, 72, 78, 84, 90, 98]
-    cmap: Spectral_r
+    label: "Temperature-Humidity Index (ITU)"
+    levels: [60, 72, 76, 77, 79, 84, 89, 98]
+    cmap: "Spectral_r"
+    vmin: 60
+    vmax: 98
     render:
       field:
-        alpha: 0.45
+        alpha: 0.42
         colorbar: true
+
+  - index: ITU
+    label: "Critical ITU thresholds"
+    render:
+      isolines:
+        levels: [72, 76, 77, 79, 84, 89]
+        style: "-"
+        color: "#111111"
+        linewidth: 1.05
+        alpha: 0.92
+        label: true
+        label_fontsize: 8
+        label_fmt: "ITU {value:.0f}"
+
+zones: []
+data_layers: []
+operational_overlays: []
+points: []
+observations: []
+temporal_overlays: []
 """.strip()
 
 TEMPLATES = {
