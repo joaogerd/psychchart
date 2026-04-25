@@ -237,6 +237,23 @@ def _apply_csv_import(st, data: dict) -> dict:
     return edited
 
 
+def _select_template_yaml(st, template_name: str, uploaded_text: str | None) -> str:
+    """Return the active YAML text, refreshing it when the template changes."""
+    if uploaded_text is not None:
+        st.session_state.yaml_text = uploaded_text
+        st.session_state.active_template = None
+        return st.session_state.yaml_text
+
+    reset_requested = st.sidebar.button("Reset from template")
+    template_changed = st.session_state.get("active_template") != template_name
+
+    if "yaml_text" not in st.session_state or reset_requested or template_changed:
+        st.session_state.yaml_text = TEMPLATES[template_name]
+        st.session_state.active_template = template_name
+
+    return st.session_state.yaml_text
+
+
 def _render(yaml_text: str):
     with tempfile.TemporaryDirectory() as tmpdir:
         path = Path(tmpdir) / "interactive.yaml"
@@ -262,12 +279,10 @@ def main() -> None:
 
     template = st.sidebar.selectbox("Template", list(TEMPLATES), index=0)
     upload = st.sidebar.file_uploader("Load YAML", type=["yaml", "yml"])
-    if "yaml_text" not in st.session_state or st.sidebar.button("Reset from template"):
-        st.session_state.yaml_text = TEMPLATES[template]
-    if (text := _uploaded_text(upload)) is not None:
-        st.session_state.yaml_text = text
+    uploaded_yaml_text = _uploaded_text(upload)
+    active_yaml_text = _select_template_yaml(st, template, uploaded_yaml_text)
 
-    data = _apply_controls(st, _load_yaml(st.session_state.yaml_text))
+    data = _apply_controls(st, _load_yaml(active_yaml_text))
     data = _apply_csv_import(st, data)
     point_readout, show_readout_point = _render_point_readout_sidebar(st, float(data.get("chart", {}).get("pressure", 101325.0)))
     data = _inject_readout_point(data, point_readout, show_readout_point)
@@ -279,6 +294,7 @@ def main() -> None:
         _render_point_readout_card(st, point_readout)
         st.subheader("YAML source of truth")
         yaml_text = st.text_area("Edit YAML", value=yaml_text, height=620)
+        st.session_state.yaml_text = yaml_text
         st.download_button("Download YAML", yaml_text.encode("utf-8"), "psychchart_interactive.yaml", "text/yaml")
         st.download_button("Download report", report_text.encode("utf-8"), "psychchart_report.md", "text/markdown")
     with left:
