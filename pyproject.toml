@@ -34,6 +34,7 @@ parquet = [
 
 [project.scripts]
 psychchart = "psychchart.cli:main"
+psychchart-app = "psychchart.app.launcher:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
