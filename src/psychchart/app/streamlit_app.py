@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import io
 import tempfile
 from pathlib import Path
@@ -25,6 +26,9 @@ DEFAULT_OPERATIONAL_OVERLAY: dict[str, Any] = {
 }
 
 
+# =============================================================================
+# Basic utilities
+# =============================================================================
 def _require_streamlit():
     try:
         import streamlit as st
@@ -54,6 +58,22 @@ def _uploaded_text(uploaded_file) -> str | None:
     return uploaded_file.getvalue().decode("utf-8")
 
 
+def _is_empty_layer_value(value: Any) -> bool:
+    """Return True for absent or intentionally empty layer sections."""
+    return value is None or value == [] or value == {}
+
+
+def _template_data(template_name: str) -> dict[str, Any]:
+    """Return a parsed copy of one built-in template."""
+    return copy.deepcopy(_load_yaml(TEMPLATES.get(template_name, "")))
+
+
+def _template_section(template_name: str, section: str, fallback: Any) -> Any:
+    """Return a deep copy of a section from the active template."""
+    data = _template_data(template_name)
+    return copy.deepcopy(data.get(section, fallback))
+
+
 def _layer_count(data: dict, key: str) -> int:
     value = data.get(key)
     if isinstance(value, list):
@@ -63,6 +83,9 @@ def _layer_count(data: dict, key: str) -> int:
     return 0
 
 
+# =============================================================================
+# Report and readout helpers
+# =============================================================================
 def _build_report(data: dict, yaml_text: str) -> str:
     chart = data.get("chart", {}) or {}
     return "\n".join(
@@ -162,6 +185,9 @@ def _inject_readout_point(data: dict, result: dict[str, float], enabled: bool) -
     return edited
 
 
+# =============================================================================
+# Layer-manager helpers
+# =============================================================================
 def _ensure_operational_overlay(data: dict) -> dict:
     """Ensure one default operational overlay exists when the UI toggle is enabled."""
     edited = dict(data)
@@ -172,7 +198,67 @@ def _ensure_operational_overlay(data: dict) -> dict:
     return edited
 
 
-def _apply_controls(st, data: dict) -> dict:
+def _restore_or_hide_section(
+    st,
+    data: dict,
+    section: str,
+    enabled: bool,
+    template_name: str,
+    fallback: Any,
+) -> dict:
+    """
+    Hide or restore a top-level layer section without destroying its content.
+
+    The app rewrites YAML on every Streamlit rerun. A simple unchecked checkbox
+    would otherwise replace a section with an empty list, making it impossible
+    to restore the previous content when the checkbox is enabled again. This
+    helper caches the previous section and falls back to the active template.
+    """
+    edited = dict(data)
+    cache_key = f"layer_manager_cache_{section}"
+
+    if enabled:
+        current = edited.get(section)
+        if _is_empty_layer_value(current):
+            cached = st.session_state.get(cache_key)
+            restored = cached if not _is_empty_layer_value(cached) else _template_section(template_name, section, fallback)
+            edited[section] = copy.deepcopy(restored)
+        return edited
+
+    current = edited.get(section)
+    if not _is_empty_layer_value(current):
+        st.session_state[cache_key] = copy.deepcopy(current)
+    edited[section] = copy.deepcopy(fallback)
+    return edited
+
+
+def _restore_or_hide_relative_humidity(st, data: dict, enabled: bool, template_name: str) -> dict:
+    """Hide or restore the relative-humidity isoline group non-destructively."""
+    edited = dict(data)
+    isolines = dict(edited.get("isolines", {}) or {})
+    cache_key = "layer_manager_cache_relative_humidity"
+
+    if enabled:
+        if "relative_humidity" not in isolines:
+            cached = st.session_state.get(cache_key)
+            template_isolines = _template_section(template_name, "isolines", {}) or {}
+            restored = cached if not _is_empty_layer_value(cached) else template_isolines.get("relative_humidity")
+            if restored is not None:
+                isolines["relative_humidity"] = copy.deepcopy(restored)
+        edited["isolines"] = isolines
+        return edited
+
+    if "relative_humidity" in isolines:
+        st.session_state[cache_key] = copy.deepcopy(isolines["relative_humidity"])
+        isolines.pop("relative_humidity", None)
+    edited["isolines"] = isolines
+    return edited
+
+
+# =============================================================================
+# UI state application
+# =============================================================================
+def _apply_controls(st, data: dict, template_name: str) -> dict:
     edited = dict(data)
     chart = dict(edited.get("chart", {}))
     edited["chart"] = chart
@@ -185,32 +271,61 @@ def _apply_controls(st, data: dict) -> dict:
         chart["pressure"] = st.number_input("Pressure", value=float(chart.get("pressure", 101325.0)), step=100.0)
 
     with st.sidebar.expander("Layer manager", expanded=True):
-        if not st.checkbox("RH isolines", value="relative_humidity" in edited.get("isolines", {})):
-            isolines = dict(edited.get("isolines", {}))
-            isolines.pop("relative_humidity", None)
-            edited["isolines"] = isolines
-        if not st.checkbox("Index layers", value=bool(edited.get("indexes"))):
-            edited["indexes"] = []
-        if not st.checkbox("Zones", value=bool(edited.get("zones"))):
-            edited["zones"] = []
-        if not st.checkbox("Data layers", value=bool(edited.get("data_layers"))):
-            edited["data_layers"] = []
+        show_rh = st.checkbox(
+            "RH isolines",
+            value="relative_humidity" in (edited.get("isolines", {}) or {}),
+        )
+        edited = _restore_or_hide_relative_humidity(st, edited, show_rh, template_name)
+
+        show_indexes = st.checkbox("Index layers", value=not _is_empty_layer_value(edited.get("indexes")))
+        edited = _restore_or_hide_section(st, edited, "indexes", show_indexes, template_name, [])
+
+        show_zones = st.checkbox("Zones", value=not _is_empty_layer_value(edited.get("zones")))
+        edited = _restore_or_hide_section(st, edited, "zones", show_zones, template_name, [])
+
+        show_data_layers = st.checkbox("Data layers", value=not _is_empty_layer_value(edited.get("data_layers")))
+        edited = _restore_or_hide_section(st, edited, "data_layers", show_data_layers, template_name, [])
 
         show_operational = st.checkbox(
             "Management layer",
-            value=bool(edited.get("operational_overlays")),
+            value=not _is_empty_layer_value(edited.get("operational_overlays")),
             help="Draw the operational cooling-management overlay.",
         )
         if show_operational:
+            edited = _restore_or_hide_section(
+                st,
+                edited,
+                "operational_overlays",
+                True,
+                template_name,
+                [],
+            )
             edited = _ensure_operational_overlay(edited)
         else:
-            edited["operational_overlays"] = []
+            edited = _restore_or_hide_section(
+                st,
+                edited,
+                "operational_overlays",
+                False,
+                template_name,
+                [],
+            )
 
     if edited.get("operational_overlays"):
         with st.sidebar.expander("Management state", expanded=True):
             overlay = dict(edited["operational_overlays"][0])
-            overlay["load_class"] = st.selectbox("Load class", ["A0", "A1", "A2", "A3", "A4"], index=["A0", "A1", "A2", "A3", "A4"].index(overlay.get("load_class", "A2")))
-            overlay["trend"] = st.selectbox("Trend", ["falling", "steady", "rising"], index=["falling", "steady", "rising"].index(overlay.get("trend", "steady")))
+            load_classes = ["A0", "A1", "A2", "A3", "A4"]
+            trends = ["falling", "steady", "rising"]
+            overlay["load_class"] = st.selectbox(
+                "Load class",
+                load_classes,
+                index=load_classes.index(overlay.get("load_class", "A2")),
+            )
+            overlay["trend"] = st.selectbox(
+                "Trend",
+                trends,
+                index=trends.index(overlay.get("trend", "steady")),
+            )
             overlay["alpha"] = st.slider("Management alpha", 0.0, 0.7, float(overlay.get("alpha", 0.18)), 0.01)
             overlay["zorder"] = st.slider("Management z-order", 0.0, 10.0, float(overlay.get("zorder", 0.55)), 0.05)
             overlay["show_boundaries"] = st.checkbox("Show management boundaries", value=bool(overlay.get("show_boundaries", True)))
@@ -310,7 +425,7 @@ def main() -> None:
     uploaded_yaml_text = _uploaded_text(upload)
     active_yaml_text = _select_template_yaml(st, template, uploaded_yaml_text)
 
-    data = _apply_controls(st, _load_yaml(active_yaml_text))
+    data = _apply_controls(st, _load_yaml(active_yaml_text), template)
     data = _apply_csv_import(st, data)
     point_readout, show_readout_point = _render_point_readout_sidebar(st, float(data.get("chart", {}).get("pressure", 101325.0)))
     data = _inject_readout_point(data, point_readout, show_readout_point)
