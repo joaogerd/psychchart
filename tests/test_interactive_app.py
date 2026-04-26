@@ -1,9 +1,11 @@
 from psychchart import load_chart_config
+from psychchart.app.services import (
+    compute_point_readout,
+    dump_yaml,
+    inject_readout_point,
+    load_yaml_text,
+)
 from psychchart.app.streamlit_app import (
-    _compute_point_readout,
-    _dump_yaml,
-    _inject_readout_point,
-    _load_yaml,
     _restore_or_hide_relative_humidity,
     _restore_or_hide_section,
     _select_template_yaml,
@@ -44,12 +46,12 @@ class FakeStreamlit:
 
 def test_interactive_app_yaml_helpers_roundtrip():
     """The app YAML helpers must preserve mapping-based YAML documents."""
-    data = _load_yaml("chart:\n  t_min: 10\n  t_max: 40\n")
+    data = load_yaml_text("chart:\n  t_min: 10\n  t_max: 40\n")
 
     assert data["chart"]["t_min"] == 10
     assert data["chart"]["t_max"] == 40
 
-    dumped = _dump_yaml(data)
+    dumped = dump_yaml(data)
     assert "chart:" in dumped
     assert "t_min: 10" in dumped
 
@@ -147,7 +149,7 @@ def test_layer_manager_restores_template_section_when_cache_is_empty():
         fallback=[],
     )
 
-    assert restored["indexes"] == _load_yaml(TEMPLATES["Minimal ITU chart"])["indexes"]
+    assert restored["indexes"] == load_yaml_text(TEMPLATES["Minimal ITU chart"])["indexes"]
 
 
 def test_layer_manager_hides_and_restores_relative_humidity():
@@ -182,10 +184,10 @@ def test_layer_manager_hides_and_restores_relative_humidity():
 def test_point_readout_injection_adds_single_reference_point():
     """The interactive readout must be injected as one replaceable point."""
     base = {"chart": {"pressure": 101325}, "points": []}
-    readout = _compute_point_readout(T=30.0, RH_pct=50.0, pressure=101325.0)
+    readout = compute_point_readout(T=30.0, RH_pct=50.0, pressure=101325.0)
 
-    first = _inject_readout_point(base, readout, enabled=True)
-    second = _inject_readout_point(first, readout, enabled=True)
+    first = inject_readout_point(base, readout, enabled=True)
+    second = inject_readout_point(first, readout, enabled=True)
 
     readout_points = [
         point for point in second["points"] if point["label"].startswith("Readout:")
@@ -194,14 +196,14 @@ def test_point_readout_injection_adds_single_reference_point():
     assert len(readout_points) == 1
     assert readout_points[0]["t"] == 30.0
     assert readout_points[0]["rh"] == 0.5
-    assert readout_points[0]["marker"] == "X"
+    assert readout_points[0]["marker"] == "corner_cross"
 
 
 def test_point_readout_injection_can_be_disabled():
     """Disabling the chart readout marker must remove prior readout points."""
     base = {"points": [{"t": 20, "rh": 0.5, "label": "Readout: old"}]}
-    readout = _compute_point_readout(T=30.0, RH_pct=50.0, pressure=101325.0)
+    readout = compute_point_readout(T=30.0, RH_pct=50.0, pressure=101325.0)
 
-    result = _inject_readout_point(base, readout, enabled=False)
+    result = inject_readout_point(base, readout, enabled=False)
 
     assert result["points"] == []
