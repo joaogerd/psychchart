@@ -17,20 +17,17 @@ from matplotlib.patches import Patch
 
 from psychchart.config.operations import OperationalOverlayConfig
 from psychchart.indexes.itu import ITU
-from psychchart.operations.enums import OperationalAction, TrendMode
-from psychchart.operations.zones import build_operational_zone_field
+from psychchart.operations.management_engine import (
+    ACTIONS,
+    action_colors,
+    action_labels,
+    classify_management,
+)
 from psychchart.psychrometrics import Psychrometrics
 
 
 def _default_itu_evaluator(T: np.ndarray, RH: np.ndarray) -> np.ndarray:
-    """
-    Evaluate ITU on array inputs.
-
-    The operational layer uses the same ITU implementation registered in the
-    index system instead of importing an obsolete experimental domain-engine
-    module. This keeps operational overlays numerically aligned with the ITU
-    fields and isolines rendered elsewhere in the chart.
-    """
+    """Evaluate ITU on array inputs using the canonical ITU implementation."""
     return ITU.compute_vectorized({"T": T, "RH": RH})
 
 
@@ -38,9 +35,7 @@ def _wrap_humidity_ratio_candidate(
     candidate: Callable,
     pressure: float,
 ) -> Callable[[np.ndarray, np.ndarray], np.ndarray]:
-    """
-    Wrap supported humidity-ratio call signatures into ``f(T, RH)``.
-    """
+    """Wrap supported humidity-ratio call signatures into ``f(T, RH)``."""
 
     def evaluator(T: np.ndarray, RH: np.ndarray) -> np.ndarray:
         try:
@@ -54,14 +49,7 @@ def _wrap_humidity_ratio_candidate(
 def _resolve_humidity_ratio_evaluator(
     chart,
 ) -> Callable[[np.ndarray, np.ndarray], np.ndarray]:
-    """
-    Resolve a humidity-ratio evaluator from the live chart object.
-
-    The operational-zone builder expects a callable with signature
-    ``f(T, RH) -> W``. The current psychrometric core exposes the canonical
-    method ``Psychrometrics.humidity_ratio(T, RH, P)``. Older experimental
-    versions used names such as ``humidity_ratio_from_rh`` or ``w_from_t_rh``.
-    """
+    """Resolve a humidity-ratio evaluator from the live chart object."""
     pressure = getattr(getattr(chart, "cfg", None), "pressure", 101325.0)
     candidates = []
 
@@ -100,52 +88,115 @@ def _resolve_humidity_ratio_evaluator(
     )
 
 
-def _build_action_colormap(profile):
-    """Build categorical colormap and norm for operational actions."""
-    ordered_actions = list(OperationalAction)
-    colors = [profile.action_styles[action].facecolor for action in ordered_actions]
-    cmap = ListedColormap(colors)
-    levels = np.arange(-0.5, len(ordered_actions) + 0.5, 1.0)
+def _trend_name(value: str) -> str:
+    """Normalize trend names from configuration values."""
+    return str(value).lower()
+
+
+def _representative_cta(chart, cfg: OperationalOverlayConfig) -> float:
+    """
+    Resolve representative CTA from overlay load class.
+
+    The interactive overlay uses a static psychrometric field. Since a true CTA
+    is temporal, this value represents the selected accumulated-load class for
+    the whole field. It keeps the operational surface explicitly tied to load
+    class while avoiding hidden time integration inside the renderer.
+    """
+    profile_name = getattr(cfg, "profile", "default")
+    load_class = getattr(cfg, "load_class", "A2")
+    profiles = getattr(chart, "operational_profiles", {}) or {}
+    profile_cfg = profiles.get(profile_name)
+
+    if profile_cfg is not None:
+        try:
+            runtime = profile_cfg.to_runtime()
+            return float(runtime.get_load_class(load_class).representative_value())
+        except Exception:
+            pass
+
+    fallback = {
+        "A0": 0.0,
+        "A1": 10.0,
+        "A2": 30.0,
+        "A3": 60.0,
+        "A4": 90.0,
+    }
+    return fallback.get(str(load_class), 30.0)
+
+
+def _build_management_field(
+    chart,
+    cfg: OperationalOverlayConfig,
+):
+    """Build a management-action field over the psychrometric domain."""
+    n_t = int(getattr(cfg, "n_t", 220))
+    n_rh = int(getattr(cfg, "n_rh", 180))
+
+    t_values = np.linspace(chart.cfg.t_min, chart.cfg.t_max, n_t)
+    rh_values = np.linspace(0.0, 1.0, n_rh)
+    T_grid, RH_grid = np.meshgrid(t_values, rh_values)
+
+    humidity_ratio_evaluator = _resolve_humidity_ratio_evaluator(chart)
+    W_grid = np.asarray(humidity_ratio_evaluator(T_grid, RH_grid), dtype=float)
+    ITU_grid = np.asarray(_default_itu_evaluator(T_grid, RH_grid), dtype=float)
+
+    CTA_grid = np.full_like(ITU_grid, _representative_cta(chart, cfg), dtype=float)
+    action_grid = classify_management(
+        T_grid,
+        RH_grid,
+        ITU_grid,
+        CTA_grid,
+        trend=_trend_name(getattr(cfg, "trend", "steady")),
+    )
+
+    mask = ~np.isfinite(W_grid)
+    y_min = getattr(chart.cfg, "y_min", None)
+    y_max = getattr(chart.cfg, "y_max", None)
+    if y_min is not None:
+        mask |= W_grid < y_min
+    if y_max is not None:
+        mask |= W_grid > y_max
+
+    return T_grid, W_grid, np.ma.masked_array(action_grid, mask=mask)
+
+
+def _build_action_colormap():
+    """Build categorical colormap and norm for management actions."""
+    colors = action_colors()
+    ordered_codes = [action.code for action in ACTIONS]
+    cmap = ListedColormap([colors[code] for code in ordered_codes])
+    levels = np.arange(-0.5, len(ordered_codes) + 0.5, 1.0)
     norm = BoundaryNorm(levels, cmap.N)
     return cmap, norm, levels
 
 
-def _legend_handles(profile):
-    """Build proxy legend handles for operational actions."""
-    handles = []
-    for action in OperationalAction:
-        style = profile.action_styles[action]
-        handles.append(
-            Patch(
-                facecolor=style.facecolor,
-                edgecolor=style.edgecolor,
-                hatch=style.hatch,
-                label=style.label,
-            )
+def _legend_handles():
+    """Build proxy legend handles for management actions."""
+    labels = action_labels()
+    colors = action_colors()
+    return [
+        Patch(
+            facecolor=colors[action.code],
+            edgecolor="black",
+            label=labels[action.code],
         )
-    return handles
+        for action in ACTIONS
+    ]
 
 
-def _draw_operational_field(
+def draw_operational_zones(
     ax: Axes,
-    field,
-    cmap: ListedColormap,
-    norm: BoundaryNorm,
-    levels: np.ndarray,
+    chart,
     cfg: OperationalOverlayConfig,
-):
-    """
-    Draw the categorical operational field as clean filled contours.
+) -> None:
+    """Draw one bovine thermal-management overlay."""
+    T_grid, W_grid, action_grid = _build_management_field(chart, cfg)
+    cmap, norm, levels = _build_action_colormap()
 
-    ``contourf`` is used instead of ``pcolormesh`` because operational actions
-    are categorical decisions, not a continuous scalar surface. This avoids the
-    fine raster-like texture that appears when dense categorical grids are drawn
-    as thousands of individual quadrilateral cells.
-    """
-    return ax.contourf(
-        field.T_grid,
-        field.W_grid,
-        field.action_grid,
+    artist = ax.contourf(
+        T_grid,
+        W_grid,
+        action_grid,
         levels=levels,
         cmap=cmap,
         norm=norm,
@@ -154,61 +205,12 @@ def _draw_operational_field(
         zorder=cfg.zorder,
     )
 
-
-def draw_operational_zones(
-    ax: Axes,
-    chart,
-    cfg: OperationalOverlayConfig,
-) -> None:
-    """
-    Draw one operational overlay for one accumulated-load class and trend.
-    """
-    operational_profiles = getattr(chart, "operational_profiles", None)
-    if operational_profiles is None:
-        raise AttributeError(
-            "PsychChart instance has no 'operational_profiles'. "
-            "Make sure AppConfig is attached to the chart instance."
-        )
-
-    if cfg.profile not in operational_profiles:
-        raise KeyError(
-            f"Operational profile {cfg.profile!r} was not found in chart."
-        )
-
-    profile_cfg = operational_profiles[cfg.profile]
-    profile = profile_cfg.to_runtime()
-
-    trend = TrendMode(cfg.trend)
-    humidity_ratio_evaluator = _resolve_humidity_ratio_evaluator(chart)
-
-    field = build_operational_zone_field(
-        chart_cfg=chart.cfg,
-        profile=profile,
-        load_class_name=cfg.load_class,
-        trend=trend,
-        itu_evaluator=_default_itu_evaluator,
-        humidity_ratio_evaluator=humidity_ratio_evaluator,
-        n_t=cfg.n_t,
-        n_rh=cfg.n_rh,
-    )
-
-    cmap, norm, levels = _build_action_colormap(profile)
-
-    artist = _draw_operational_field(
-        ax=ax,
-        field=field,
-        cmap=cmap,
-        norm=norm,
-        levels=levels,
-        cfg=cfg,
-    )
-
     if cfg.show_boundaries:
         ax.contour(
-            field.T_grid,
-            field.W_grid,
-            field.action_grid,
-            levels=np.arange(0.5, len(OperationalAction), 1.0),
+            T_grid,
+            W_grid,
+            action_grid,
+            levels=np.arange(0.5, len(ACTIONS), 1.0),
             colors=cfg.boundary_color,
             linewidths=cfg.boundary_linewidth,
             alpha=cfg.boundary_alpha,
@@ -217,16 +219,13 @@ def draw_operational_zones(
 
     if cfg.show_colorbar:
         cbar = plt.colorbar(artist, ax=ax, pad=0.02)
-        cbar.set_ticks(np.arange(len(OperationalAction)))
-        cbar.set_ticklabels(
-            [profile.action_styles[action].label for action in OperationalAction]
-        )
+        cbar.set_ticks(np.arange(len(ACTIONS)))
+        cbar.set_ticklabels([action.label for action in ACTIONS])
         cbar.set_label(cfg.colorbar_label)
 
     if cfg.show_legend:
-        handles = _legend_handles(profile)
         ax.legend(
-            handles=handles,
-            title=cfg.label or "Ação operacional",
+            handles=_legend_handles(),
+            title=cfg.label or "Thermal-management action",
             loc="best",
         )
