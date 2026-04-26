@@ -67,7 +67,7 @@ or
 # NOTE:
 # The version string is intentionally defined here to make it accessible
 # programmatically (e.g., psychchart.__version__) and by packaging tools.
-__version__ = "0.3.0"
+__version__ = '1.0.0'
 
 
 # =============================================================================
