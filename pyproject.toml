@@ -22,15 +22,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-app = [
-  "streamlit",
-]
+app = ["streamlit"]
 dev = [
   "pytest",
+  "pytest-cov",
+  "ruff",
+  "black",
 ]
-parquet = [
-  "pyarrow",
-]
+parquet = ["pyarrow"]
 
 [project.scripts]
 psychchart = "psychchart.cli:main"
@@ -41,3 +40,14 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I"]
