@@ -23,6 +23,7 @@ dependencies = [
 
 [project.optional-dependencies]
 app = ["streamlit"]
+api = ["fastapi", "uvicorn"]
 dev = [
   "pytest",
   "pytest-cov",
