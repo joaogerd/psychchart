@@ -19,7 +19,7 @@ from psychchart.config import (
     OperationalOverlayConfig,
     OperationalProfileConfig,    
 )
-
+from psychchart.plot.markers import resolve_marker
 from psychchart.data.layer_builder import build_data_layer
 # Low-level drawing helpers (single responsibility)
 from .layers import ZORDER
@@ -919,7 +919,7 @@ class PsychChart:
             self.ax.scatter(
                 p.t,
                 w,
-                marker=p.marker,
+                marker=resolve_marker(p.marker),
                 color=p.color,
                 s=p.size,
                 alpha=p.alpha,
