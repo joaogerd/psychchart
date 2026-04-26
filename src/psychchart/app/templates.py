@@ -6,6 +6,18 @@ in the interactive app does not resize or visually jump the preview area.
 
 from __future__ import annotations
 
+from pathlib import Path
+
+
+_TEMPLATE_ROOT = Path(__file__).resolve().parents[3] / "examples"
+
+
+def _read_example_template(filename: str) -> str:
+    """Read an example YAML file to reuse it as an app template."""
+    path = _TEMPLATE_ROOT / filename
+    return path.read_text(encoding="utf-8").strip()
+
+
 BOVINE_BIOCLIMATIC_TEMPLATE = """
 profile: default_si
 
@@ -314,7 +326,10 @@ observations: []
 temporal_overlays: []
 """.strip()
 
+BOVINE_STRATEGY_TEMPLATE = _read_example_template("bovine_strategy_zones.yaml")
+
 TEMPLATES = {
     "Bovine bioclimatic chart": BOVINE_BIOCLIMATIC_TEMPLATE,
+    "Bovine strategy zones": BOVINE_STRATEGY_TEMPLATE,
     "Minimal ITU chart": MINIMAL_TEMPLATE,
 }
