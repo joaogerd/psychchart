@@ -12,6 +12,7 @@ import base64
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -24,6 +25,11 @@ MEDIA_TYPES: dict[str, str] = {
     "svg": "image/svg+xml",
     "pdf": "application/pdf",
 }
+
+DEFAULT_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
 
 class RenderRequest(BaseModel):
@@ -46,6 +52,14 @@ app = FastAPI(
     title="psychChart API",
     version="0.2.0",
     description="HTTP API for rendering YAML-driven psychrometric charts.",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=DEFAULT_ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 
