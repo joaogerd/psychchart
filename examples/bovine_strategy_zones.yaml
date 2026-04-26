@@ -1,0 +1,183 @@
+profile: default_si
+
+chart:
+  t_min: 10
+  t_max: 45
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg dry air)"
+  title: "Bovine bioclimatic strategy chart"
+  output: "bovine_strategy_zones.png"
+  dpi: 200
+  style: null
+  grid: true
+  figsize: [14, 8]
+  show_tw_grid: true
+  tw_grid:
+    vertical: true
+    horizontal: true
+    every:
+      T: 5.0
+      W: 0.005
+  tw_grid_style:
+    color: "#8a8a8a"
+    linewidth: 0.45
+    linestyle: "-"
+    alpha: 0.22
+
+isolines:
+  relative_humidity:
+    enabled: true
+    values: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    color: "#6E3F4D"
+    linestyle: "-"
+    linewidth: 0.62
+    alpha: 0.42
+    labels: true
+    label_fontsize: 7
+    label_fmt: "{value:.0%}"
+
+indexes:
+  - index: ITU
+    label: "Temperature-Humidity Index (ITU)"
+    levels: [60, 72, 76, 77, 79, 84, 89, 98]
+    cmap: "Spectral_r"
+    vmin: 60
+    vmax: 98
+    render:
+      field:
+        alpha: 0.22
+        colorbar: true
+
+  - index: ITU
+    label: "Critical ITU thresholds"
+    render:
+      isolines:
+        levels: [72, 76, 77, 79, 84, 89]
+        style: "-"
+        color: "#111111"
+        linewidth: 1.0
+        alpha: 0.9
+        label: true
+        label_fontsize: 8
+        label_fmt: "ITU {value:.0f}"
+
+zones:
+  - name: "Comfort / monitoring"
+    t_range: [10, 24]
+    rh_range: [35, 85]
+    follow_rh: true
+    edgecolor: "#2E7D32"
+    facecolor: "#DFF3DF"
+    linewidth: 2.0
+    alpha: 0.22
+    show_label: true
+    label: "COMFORT /\nMONITORING"
+    label_t: 19.0
+    label_rh: 62
+    label_color: "#1B5E20"
+    label_fontsize: 9
+
+  - name: "Natural ventilation"
+    t_range: [18, 29]
+    rh_range: [30, 80]
+    follow_rh: true
+    edgecolor: "#1565C0"
+    facecolor: "none"
+    linewidth: 2.8
+    alpha: 0.0
+    show_label: true
+    label: "NATURAL\nVENTILATION"
+    label_t: 25.0
+    label_rh: 78
+    label_color: "#0D47A1"
+    label_fontsize: 9
+    label_rotation: 38
+
+  - name: "Forced ventilation"
+    t_range: [24, 33]
+    rh_range: [35, 88]
+    follow_rh: true
+    edgecolor: "#B7950B"
+    facecolor: "none"
+    linewidth: 2.8
+    alpha: 0.0
+    show_label: true
+    label: "FORCED\nVENTILATION"
+    label_t: 29.0
+    label_rh: 70
+    label_color: "#8A6D00"
+    label_fontsize: 9
+    label_rotation: 0
+
+  - name: "Sprinkling + ventilation"
+    t_range: [27, 37]
+    rh_range: [25, 78]
+    follow_rh: true
+    edgecolor: "#E67E22"
+    facecolor: "none"
+    linewidth: 3.0
+    alpha: 0.0
+    show_label: true
+    label: "SPRINKLING +\nVENTILATION"
+    label_t: 34.0
+    label_rh: 48
+    label_color: "#AF601A"
+    label_fontsize: 9
+    label_rotation: 90
+
+  - name: "Evaporative cooling"
+    t_range: [30, 42]
+    rh_range: [10, 60]
+    follow_rh: true
+    edgecolor: "#7B1FA2"
+    facecolor: "none"
+    linewidth: 3.0
+    alpha: 0.0
+    show_label: true
+    label: "EVAPORATIVE\nCOOLING"
+    label_t: 37.0
+    label_rh: 28
+    label_color: "#4A148C"
+    label_fontsize: 9
+    label_rotation: 0
+
+  - name: "Intensive cooling"
+    t_range: [32, 45]
+    rh_range: [55, 100]
+    follow_rh: true
+    edgecolor: "#C0392B"
+    facecolor: "none"
+    linewidth: 3.2
+    alpha: 0.0
+    show_label: true
+    label: "INTENSIVE\nCOOLING"
+    label_t: 41.0
+    label_rh: 74
+    label_color: "#922B21"
+    label_fontsize: 9
+    label_rotation: 90
+
+  - name: "Emergency heat response"
+    t_range: [35, 45]
+    rh_range: [70, 100]
+    follow_rh: true
+    edgecolor: "#7B241C"
+    facecolor: "#F5B7B1"
+    linewidth: 3.5
+    alpha: 0.12
+    show_label: true
+    label: "EMERGENCY\nHEAT RESPONSE"
+    label_t: 41.0
+    label_rh: 88
+    label_color: "#641E16"
+    label_fontsize: 9
+    label_rotation: 0
+
+data_layers: []
+operational_overlays: []
+points: []
+observations: []
+temporal_overlays: []
