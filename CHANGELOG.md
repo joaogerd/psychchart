@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.0.0] - 2026-04-26
+
+### Added
+- Application service layer (`app/services.py`)
+- FastAPI backend (`api/fastapi_app.py`)
+- API endpoints:
+  - `/health`
+  - `/render`
+  - `/render/file`
+- Base64 and binary export support
+- CSV data layer builder for interactive usage
+- Point readout system (ITU, enthalpy, dew point, W)
+- Automated tests for services and API
+- API documentation (`docs/api_usage.md`)
+
+### Changed
+- Streamlit app refactored to use service layer
+- Project architecture reorganized into:
+  - core
+  - services
+  - interfaces (CLI, Streamlit, API)
+- README updated for product-level usage
+
+### Improved
+- Code modularity and separation of concerns
+- Reusability across CLI, app, API
+- Type safety using Pydantic and dataclasses
+
+### Fixed
+- Reduced duplication between app and core logic
+
 ## [Unreleased]
 ### Added
 - Bovine bioclimatic chart concept documentation.

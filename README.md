@@ -1,7 +1,10 @@
-# psychchart
+<p align="center">
+  <img src="docs/assets/logo.png" alt="psychChart logo" width="480">
+</p>
 
-**psychchart** is a Python package for generating **psychrometric charts** using a
-**declarative, YAML-driven configuration**.
+<p align="center">
+    A Python package for generating psychrometric charts using a declarative, YAML-driven configuration.
+</p>
 
 ---
 
