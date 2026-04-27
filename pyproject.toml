@@ -39,9 +39,16 @@ psychchart-app = "psychchart.app.launcher:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+psychchart = [
+  "profiles/*.yaml",
+  "profiles/*.yml",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
