@@ -1,10 +1,4 @@
-"""FastAPI interface for psychChart.
-
-The API is intentionally thin: it exposes HTTP endpoints around the reusable
-application services while keeping all scientific behavior inside the core
-``psychchart`` package.  This makes it suitable for React/Vite front-ends,
-institutional demos, local services and automated workflows.
-"""
+"""FastAPI interface for psychChart."""
 
 from __future__ import annotations
 
@@ -16,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from psychchart.api.workspace import ProjectRecord, WorkspaceStore
 from psychchart.app.services import close_figure, figure_to_bytes, render_figure_from_yaml
 
 ImageFormat = Literal["png", "svg", "pdf"]
@@ -31,51 +26,65 @@ DEFAULT_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
+store = WorkspaceStore()
+
 
 class RenderRequest(BaseModel):
-    """Request body for chart rendering endpoints."""
-
     yaml: str = Field(..., min_length=1, description="Full psychChart YAML configuration.")
     format: ImageFormat = Field(default="png", description="Output format.")
     dpi: int = Field(default=180, ge=72, le=600, description="Export resolution for raster output.")
 
 
 class RenderBase64Response(BaseModel):
-    """Base64-encoded render response for browser/front-end clients."""
-
     format: ImageFormat
     media_type: str
     data_base64: str
 
 
+class ProjectCreateRequest(BaseModel):
+    name: str = Field(default="Untitled chart")
+    yaml: str = Field(..., min_length=1)
+
+
+class ProjectUpdateRequest(BaseModel):
+    name: str | None = None
+    yaml: str | None = None
+
+
+class ProjectResponse(BaseModel):
+    id: str
+    name: str
+    yaml: str
+    created_at: str
+    updated_at: str
+
+
+def _project_response(record: ProjectRecord) -> ProjectResponse:
+    return ProjectResponse(**record.__dict__)
+
+
 app = FastAPI(
     title="psychChart API",
-    version="0.2.0",
-    description="HTTP API for rendering YAML-driven psychrometric charts.",
+    version="0.3.0",
+    description="HTTP API for rendering and managing YAML-driven psychrometric charts.",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=DEFAULT_ALLOWED_ORIGINS,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    """Return a lightweight health-check payload."""
     return {"status": "ok"}
 
 
 @app.post("/render", response_model=RenderBase64Response)
 def render_chart(req: RenderRequest) -> RenderBase64Response:
-    """Render a chart and return base64-encoded image data.
-
-    This endpoint is convenient for JavaScript clients because the response is
-    JSON and can be directly converted to a browser data URL.
-    """
     try:
         fig = render_figure_from_yaml(req.yaml)
         payload = figure_to_bytes(fig, req.format, dpi=req.dpi)
@@ -92,7 +101,6 @@ def render_chart(req: RenderRequest) -> RenderBase64Response:
 
 @app.post("/render/file")
 def render_chart_file(req: RenderRequest) -> Response:
-    """Render a chart and return a binary file response."""
     try:
         fig = render_figure_from_yaml(req.yaml)
         payload = figure_to_bytes(fig, req.format, dpi=req.dpi)
@@ -105,3 +113,38 @@ def render_chart_file(req: RenderRequest) -> Response:
         media_type=MEDIA_TYPES[req.format],
         headers={"Content-Disposition": f'inline; filename="psychchart.{req.format}"'},
     )
+
+
+@app.get("/projects", response_model=list[ProjectResponse])
+def list_projects() -> list[ProjectResponse]:
+    return [_project_response(item) for item in store.list_projects()]
+
+
+@app.post("/projects", response_model=ProjectResponse)
+def create_project(req: ProjectCreateRequest) -> ProjectResponse:
+    return _project_response(store.create_project(name=req.name, yaml=req.yaml))
+
+
+@app.get("/projects/{project_id}", response_model=ProjectResponse)
+def get_project(project_id: str) -> ProjectResponse:
+    try:
+        return _project_response(store.get_project(project_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Project not found") from exc
+
+
+@app.put("/projects/{project_id}", response_model=ProjectResponse)
+def update_project(project_id: str, req: ProjectUpdateRequest) -> ProjectResponse:
+    try:
+        return _project_response(store.update_project(project_id, name=req.name, yaml=req.yaml))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Project not found") from exc
+
+
+@app.delete("/projects/{project_id}")
+def delete_project(project_id: str) -> dict[str, str]:
+    try:
+        store.delete_project(project_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Project not found") from exc
+    return {"status": "deleted"}
