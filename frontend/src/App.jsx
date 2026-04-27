@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import ChartPreview from './app/preview/ChartPreview';
-import YamlEditor from './app/editor/YamlEditor';
-import Presets from './app/editor/Presets';
+import { useState } from 'react'
+import ChartPreview from './app/preview/ChartPreview'
+import YamlEditor from './app/editor/YamlEditor'
+import Presets from './app/editor/Presets'
+import WorkspacePanel from './app/components/WorkspacePanel'
 
 export default function App() {
-  const [yaml, setYaml] = useState('chart:\n  t_min: 10\n  t_max: 40');
+  const [yaml, setYaml] = useState('chart:\n  t_min: 10\n  t_max: 40')
 
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'Arial' }}>
@@ -26,6 +27,8 @@ export default function App() {
 
       </div>
 
+      <WorkspacePanel yaml={yaml} onLoad={setYaml} />
+
     </div>
-  );
+  )
 }

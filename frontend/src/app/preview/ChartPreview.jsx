@@ -1,47 +1,44 @@
-import { useState } from 'react';
-import { renderChart, buildDataUrl } from '../api/client';
+import { useState } from 'react'
+import { renderChart, buildDataUrl } from '../api/client'
 
 export default function ChartPreview({ yaml }) {
-  const [imageSrc, setImageSrc] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [imageSrc, setImageSrc] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
   const handleRender = async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
     try {
-      const result = await renderChart({ yaml });
-      setImageSrc(buildDataUrl(result));
+      const result = await renderChart({ yaml })
+      setImageSrc(buildDataUrl(result))
     } catch (err) {
-      setError(err.message);
+      setError(err.message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ marginBottom: 8 }}>
-        <button onClick={handleRender} disabled={loading}>
-          {loading ? 'Rendering…' : 'Render chart'}
+    <div className="panel preview-card">
+      <div className="toolbar">
+        <div className="toolbar-title">Preview</div>
+        <button className="btn btn-primary" onClick={handleRender} disabled={loading}>
+          {loading ? 'Rendering…' : 'Render'}
         </button>
       </div>
 
-      {error && (
-        <div style={{ color: 'red', marginBottom: 8 }}>
-          {error}
-        </div>
-      )}
+      {error && <div className="error-box">{error}</div>}
 
-      <div style={{ flex: 1, border: '1px solid #ddd', overflow: 'auto' }}>
+      <div className="preview-body">
         {imageSrc ? (
-          <img src={imageSrc} style={{ width: '100%', display: 'block' }} />
+          <img src={imageSrc} className="preview-image" />
         ) : (
-          <div style={{ padding: 16, color: '#666' }}>
-            Click "Render chart" to generate a preview.
+          <div className="empty-state">
+            Click "Render" to generate a chart preview.
           </div>
         )}
       </div>
     </div>
-  );
+  )
 }
