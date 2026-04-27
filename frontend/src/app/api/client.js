@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = import.meta.env.VITE_PSYCHCHART_API_URL || 'http://localhost:8000';
+const DEFAULT_API_BASE_URL = import.meta.env.VITE_PSYCHCHART_API_URL || '/api';
 
 export async function renderChart({ yaml, format = 'png', dpi = 180, apiBaseUrl = DEFAULT_API_BASE_URL }) {
   const response = await fetch(`${apiBaseUrl}/render`, {
