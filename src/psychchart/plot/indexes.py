@@ -21,6 +21,7 @@ from matplotlib.patches import PathPatch
 from matplotlib.colors import ListedColormap, BoundaryNorm, Normalize
 
 from psychchart.config.indexes import FieldRenderConfig, IsolineRenderConfig
+from psychchart.psychrometrics import Psychrometrics
 from psychchart.render.build_index_field import build_index_field
 from psychchart.plot.index_profiles import get_index_profile
 from psychchart.indexes.registry import INDEX_REGISTRY
@@ -73,12 +74,35 @@ def _get_index_layer(chart, index):
     return index_cls, layer
 
 
-def _resolve_field_label_position(position, fallback_label: str) -> tuple[float | None, float | None, str, float | None]:
+def _normalize_rh(rh: float | None) -> float | None:
+    """
+    Normalize relative humidity from fraction or percent to fraction.
+    """
+    if rh is None:
+        return None
+    return rh / 100.0 if rh > 1.0 else rh
+
+
+def _resolve_field_label_position(
+    position,
+    fallback_label: str,
+    pressure: float,
+) -> tuple[float | None, float | None, str, float | None]:
     """
     Normalize one manual label position.
+
+    Supported coordinate forms are:
+    - ``x``/``y``: raw chart coordinates, equivalent to T/W;
+    - ``t``/``w``: dry-bulb temperature and humidity ratio;
+    - ``t``/``rh``: dry-bulb temperature and relative humidity.
     """
     x = position.x if position.x is not None else position.t
     y = position.y if position.y is not None else position.w
+
+    if y is None and position.t is not None and position.rh is not None:
+        rh = _normalize_rh(position.rh)
+        y = Psychrometrics.humidity_ratio(position.t, rh, pressure)
+
     label = position.label or fallback_label
     return x, y, label, position.rotation
 
@@ -115,7 +139,7 @@ def _auto_field_label_position(ax: Axes, layer, lower: float, upper: float) -> t
     return float(np.nanmedian(x_values)), float(np.nanmedian(y_values))
 
 
-def _draw_index_field_labels(ax: Axes, layer, field_cfg, levels, labels) -> None:
+def _draw_index_field_labels(ax: Axes, layer, field_cfg, levels, labels, pressure: float) -> None:
     """
     Draw semantic class labels inside the psychrometric diagram.
     """
@@ -144,6 +168,7 @@ def _draw_index_field_labels(ax: Axes, layer, field_cfg, levels, labels) -> None
             x, y, label, manual_rotation = _resolve_field_label_position(
                 manual_positions[i],
                 label,
+                pressure,
             )
             if manual_rotation is not None:
                 rotation = manual_rotation
@@ -239,7 +264,7 @@ def _draw_index_field(chart, ax: Axes, layer, cfg):
             zorder=ZORDER["index_field"],
         )
 
-    _draw_index_field_labels(ax, layer, field_cfg, levels, labels)
+    _draw_index_field_labels(ax, layer, field_cfg, levels, labels, chart.cfg.pressure)
 
     if field_cfg.colorbar:
         cbar = chart.fig.colorbar(artist, ax=ax)
