@@ -83,7 +83,39 @@ def _resolve_field_label_position(position, fallback_label: str) -> tuple[float 
     return x, y, label, position.rotation
 
 
-def _draw_index_field_labels(ax: Axes, field_cfg, levels, labels) -> None:
+def _auto_field_label_position(ax: Axes, layer, lower: float, upper: float) -> tuple[float | None, float | None]:
+    """
+    Estimate an in-domain label position for one index-value interval.
+
+    The interval bounds are index values, not plot coordinates. Therefore the
+    position is computed from the centroid of the corresponding mask in the
+    psychrometric grid.
+    """
+    x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
+
+    mask = (
+        np.isfinite(layer.Z)
+        & (layer.Z >= lower)
+        & (layer.Z < upper)
+        & np.isfinite(layer.X)
+        & np.isfinite(layer.Y)
+        & (layer.X >= x_min)
+        & (layer.X <= x_max)
+        & (layer.Y >= y_min)
+        & (layer.Y <= y_max)
+    )
+
+    if not np.any(mask):
+        return None, None
+
+    x_values = layer.X[mask]
+    y_values = layer.Y[mask]
+
+    return float(np.nanmedian(x_values)), float(np.nanmedian(y_values))
+
+
+def _draw_index_field_labels(ax: Axes, layer, field_cfg, levels, labels) -> None:
     """
     Draw semantic class labels inside the psychrometric diagram.
     """
@@ -116,12 +148,20 @@ def _draw_index_field_labels(ax: Axes, field_cfg, levels, labels) -> None:
             if manual_rotation is not None:
                 rotation = manual_rotation
 
-        if x is None:
-            x = 0.5 * (levels[i] + levels[i + 1])
+        if x is None or y is None:
+            auto_x, auto_y = _auto_field_label_position(
+                ax,
+                layer,
+                levels[i],
+                levels[i + 1],
+            )
+            if x is None:
+                x = auto_x
+            if y is None:
+                y = auto_y
 
-        if y is None:
-            y_min, y_max = ax.get_ylim()
-            y = y_min + (0.22 + 0.18 * (i % 2)) * (y_max - y_min)
+        if x is None or y is None:
+            continue
 
         ax.text(
             x,
@@ -199,7 +239,7 @@ def _draw_index_field(chart, ax: Axes, layer, cfg):
             zorder=ZORDER["index_field"],
         )
 
-    _draw_index_field_labels(ax, field_cfg, levels, labels)
+    _draw_index_field_labels(ax, layer, field_cfg, levels, labels)
 
     if field_cfg.colorbar:
         cbar = chart.fig.colorbar(artist, ax=ax)
