@@ -21,13 +21,20 @@ from .base import StrictModel
 
 
 class FieldLabelPosition(StrictModel):
-    """Manual position for one in-chart field label."""
+    """Manual position for one in-chart field label.
+
+    Positions may be declared directly in chart coordinates ``T x W`` using
+    ``t``/``w`` or in the more intuitive ``T x RH`` form using ``t``/``rh``.
+    Relative humidity may be provided either as a fraction in ``[0, 1]`` or as
+    a percentage in ``[0, 100]``.
+    """
 
     label: Optional[str] = None
     x: Optional[float] = None
     y: Optional[float] = None
     t: Optional[float] = None
     w: Optional[float] = None
+    rh: Optional[float] = None
     rotation: Optional[float] = None
 
 
@@ -84,6 +91,10 @@ class IndexConfig(BaseModel):
                 labels: true
                 label_fontsize: 24
                 label_rotation: -18
+                label_positions:
+                  - label: "Comfort"
+                    t: 14
+                    rh: 60
 
     ``levels``, ``colors`` and ``labels`` are index semantics. They do not live
     under ``render.field``. The nested ``render.field.labels`` flag only controls
