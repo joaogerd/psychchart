@@ -1,5 +1,13 @@
 # `zones` e `index_zones` — regiões do gráfico
 
+O psychChart possui dois mecanismos para representar áreas no diagrama psicrométrico.
+
+`zones` representa zonas geométricas, definidas diretamente por vértices ou por intervalos de temperatura e umidade relativa.
+
+`index_zones` representa zonas calculadas a partir de uma faixa de índice. Esse é o mecanismo correto para pintar uma área baseada em ITU, HLI ou outro índice registrado.
+
+---
+
 ## `zones`
 
 ## O que é
@@ -8,11 +16,9 @@ Zona geométrica definida por vértices explícitos ou por intervalos de tempera
 
 ## Para que serve
 
-Serve para representar regiões como conforto, alerta, operação admissível ou qualquer outra área de interesse no gráfico.
+Serve para representar regiões como conforto, alerta, operação admissível, envelope experimental ou qualquer outra área definida diretamente no espaço psicrométrico.
 
 ## Parâmetros disponíveis
-
-### Confirmado no código
 
 - `name`
 - `vertices`
@@ -23,20 +29,16 @@ Serve para representar regiões como conforto, alerta, operação admissível ou
 - `facecolor`
 - `linewidth`
 - `alpha`
-
-## Valores aceitos
-
-- `name`: texto.
-- `vertices`: lista de pares numéricos.
-- `t_range`: par numérico.
-- `rh_range`: par numérico.
-- `follow_rh`: booleano.
-- `edgecolor`, `facecolor`: texto.
-- `linewidth`, `alpha`: número.
+- `show_label`
+- `label`
+- `label_t`
+- `label_rh`
+- `label_color`
+- `label_fontsize`
+- `label_rotation`
+- `label_bbox`
 
 ## Exemplo de uso
-
-### Zona por intervalos
 
 ```yaml
 zones:
@@ -48,39 +50,17 @@ zones:
     facecolor: lightgreen
     linewidth: 1.5
     alpha: 0.3
-```
-
-### Zona por vértices
-
-```yaml
-zones:
-  - name: comfort_polygon
-    vertices:
-      - [20.0, 0.006]
-      - [24.0, 0.007]
-      - [26.0, 0.009]
-    edgecolor: green
-    facecolor: lightgreen
+    show_label: true
+    label: "Comfort"
+    label_t: 22
+    label_rh: 55
 ```
 
 ## Observações importantes
 
-### Confirmado no código
-
-- `rh_range` aceita porcentagem ou fração e é normalizado para fração.
-- A zona pode ser declarada por geometria explícita (`vertices`) ou por faixas semânticas (`t_range` + `rh_range`).
-
-### Inferência controlada
-
-- `follow_rh: true` sugere que o contorno deve seguir curvas de umidade relativa, e não um retângulo bruto.
-
-### Não foi possível validar
-
-- O algoritmo exato que transforma `t_range` + `rh_range` em polígono final.
-
-## Erros comuns
-
-- Misturar coordenadas de `vertices` com a ideia de `rh_range`: `vertices` aparenta esperar coordenadas finais do gráfico, enquanto `rh_range` ainda está em umidade relativa.
+- `rh_range` e `label_rh` aceitam porcentagem ou fração e são normalizados internamente.
+- `follow_rh: true` faz o contorno seguir curvas de umidade relativa.
+- Use `zones` quando a geometria da região já é conhecida antes do cálculo de qualquer índice.
 
 ---
 
@@ -92,47 +72,90 @@ Zona semântica definida por um intervalo de um índice calculado, e não por ge
 
 ## Para que serve
 
-Serve para classificar o gráfico por faixas de índice, como conforto, alerta ou perigo.
+Serve para pintar regiões do gráfico onde um índice fica dentro de uma faixa numérica, por exemplo:
+
+```text
+68 <= ITU <= 72
+```
+
+Nesse caso, o psychChart avalia o índice em todo o domínio físico válido do gráfico e preenche a região onde o valor calculado satisfaz o intervalo definido.
 
 ## Parâmetros disponíveis
-
-### Confirmado no código
 
 - `index`
 - `name`
 - `range`
 - `color`
+- `facecolor`
+- `edgecolor`
+- `linewidth`
 - `alpha`
+- `show_label`
+- `label`
+- `label_position`
+- `label_t`
+- `label_rh`
+- `label_color`
+- `label_fontsize`
+- `label_fontweight`
+- `label_rotation`
+- `label_bbox`
 - `parameters`
 
 ## Valores aceitos
 
-- `index`, `name`, `color`: texto.
-- `range`: par numérico.
-- `alpha`: número.
-- `parameters`: objeto.
+- `index`, `name`, `color`, `facecolor`, `edgecolor`, `label`, `label_color`, `label_fontweight`: texto.
+- `range`: par numérico com limite inferior menor que limite superior.
+- `alpha`, `linewidth`, `label_fontsize`, `label_rotation`, `label_t`, `label_rh`: número.
+- `show_label`: booleano.
+- `label_position`: `auto` ou `manual`.
+- `parameters`, `label_bbox`: objeto.
 
-## Exemplo de uso
+## Exemplo com rótulo interno automático
 
 ```yaml
 index_zones:
   - index: ITU
-    name: comfort
-    range: [20, 72]
-    color: green
-    alpha: 0.25
+    name: "ITU comfort zone"
+    range: [68, 72]
+    facecolor: "#A8E67A"
+    edgecolor: "#5B8F3A"
+    alpha: 0.38
+    linewidth: 1.1
+    show_label: true
+    label: "ITU"
+    label_position: auto
+    label_color: "#2F3A2F"
+    label_fontsize: 12
+    label_fontweight: "bold"
+    label_rotation: 72
 ```
 
-## Observações importantes
+## Exemplo com rótulo interno manual
 
-### Confirmado no código
-
-- `parameters` existe para índices parametrizados.
-
-### Não foi possível validar
-
-- Como a região espacial correspondente a `range` é calculada no gráfico.
+```yaml
+index_zones:
+  - index: ITU
+    name: "ITU comfort zone"
+    range: [68, 72]
+    facecolor: "#A8E67A"
+    edgecolor: "#5B8F3A"
+    alpha: 0.38
+    linewidth: 1.1
+    show_label: true
+    label: "ITU"
+    label_position: manual
+    label_t: 25.5
+    label_rh: 55
+    label_color: "#2F3A2F"
+    label_fontsize: 12
+    label_fontweight: "bold"
+    label_rotation: 72
+```
 
 ## Erros comuns
 
-- Definir `index_zones` sem que o índice correspondente exista no runtime.
+- Usar `zones` para representar uma faixa de ITU. Para isso, use `index_zones`.
+- Usar `label_position: manual` sem informar `label_t` e `label_rh`.
+- Definir `range` com limite inferior maior ou igual ao limite superior.
+- Definir `index_zones` com um índice que não existe no registry.
