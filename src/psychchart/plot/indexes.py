@@ -1,40 +1,24 @@
-"""
-Index rendering utilities for psychrometric charts.
-
-Pure rendering layer.
-
-Responsibilities:
-- Receive precomputed index layers (via render/)
-- Draw them using matplotlib
-
-Non-responsibilities:
-- No index computation
-- No grid building
-- No psychrometric transformations
-"""
+"""Index rendering utilities for psychrometric charts."""
 
 from __future__ import annotations
-import numpy as np
-from matplotlib.pyplot import get_cmap
-from matplotlib.axes import Axes
-from matplotlib.patches import PathPatch
-from matplotlib.colors import ListedColormap, BoundaryNorm, Normalize
 
-from psychchart.render.build_index_field import build_index_field
-from psychchart.plot.index_profiles import get_index_profile
-from psychchart.indexes.registry import INDEX_REGISTRY
+import numpy as np
+from matplotlib.axes import Axes
+from matplotlib.colors import BoundaryNorm, ListedColormap, Normalize
+from matplotlib.pyplot import get_cmap
+
+from psychchart.config import FieldRenderConfig, IsolineRenderConfig
 from psychchart.indexes.base import BaseIndex
+from psychchart.indexes.registry import INDEX_REGISTRY
+from psychchart.plot.index_profiles import get_index_profile
+from psychchart.render.build_index_field import build_index_field
+
 from .layers import ZORDER
 from .operational_zones import draw_operational_zones
 
 
-# =============================================================================
-# Helpers
-# =============================================================================
 def _resolve_index(index) -> type[BaseIndex]:
-    """
-    Resolve index from string or class.
-    """
+    """Resolve an index identifier to its registered index class."""
     if isinstance(index, str):
         if index not in INDEX_REGISTRY:
             raise ValueError(f"Unknown index '{index}'")
@@ -47,13 +31,7 @@ def _resolve_index(index) -> type[BaseIndex]:
 
 
 def _get_index_layer(chart, index):
-    """
-    Resolve index and safely build its scalar field layer.
-
-    Returns
-    -------
-    (index_cls, layer) or (index_cls, None)
-    """
+    """Resolve an index and build/cache its scalar field layer."""
     if not hasattr(chart, "_index_cache"):
         chart._index_cache = {}
 
@@ -68,17 +46,11 @@ def _get_index_layer(chart, index):
         return index_cls, None
 
     chart._index_cache[index] = layer
-
     return index_cls, layer
 
 
-# =============================================================================
-# Continuous index fields (heatmaps)
-# =============================================================================
 def _draw_index_field(chart, ax: Axes, layer, cfg):
-    """
-    Render a continuous psychrometric index field as a background layer.
-    """
+    """Render a continuous psychrometric index field."""
     profile = get_index_profile(cfg.index)
     field_cfg = (
         cfg.render.field
@@ -95,10 +67,7 @@ def _draw_index_field(chart, ax: Axes, layer, cfg):
     if levels:
         if cfg.cmap:
             cmap = cfg.cmap
-            norm = BoundaryNorm(
-                levels,
-                get_cmap(cmap).N if isinstance(cmap, str) else cmap.N,
-            )
+            norm = BoundaryNorm(levels, get_cmap(cmap).N if isinstance(cmap, str) else cmap.N)
         elif colors:
             cmap = ListedColormap(colors)
             norm = BoundaryNorm(levels, cmap.N)
@@ -108,6 +77,8 @@ def _draw_index_field(chart, ax: Axes, layer, cfg):
     if norm is None and (cfg.vmin is not None or cfg.vmax is not None):
         norm = Normalize(vmin=cfg.vmin, vmax=cfg.vmax)
 
+    alpha = 1.0 if field_cfg.alpha is None else field_cfg.alpha
+
     if levels:
         artist = ax.contourf(
             layer.X,
@@ -116,7 +87,7 @@ def _draw_index_field(chart, ax: Axes, layer, cfg):
             levels=levels,
             cmap=cmap,
             norm=norm,
-            alpha=field_cfg.alpha,
+            alpha=alpha,
             zorder=ZORDER["index_field"],
             extend="max",
         )
@@ -128,7 +99,7 @@ def _draw_index_field(chart, ax: Axes, layer, cfg):
             shading="auto",
             cmap=cmap,
             norm=norm,
-            alpha=field_cfg.alpha,
+            alpha=alpha,
             zorder=ZORDER["index_field"],
         )
 
@@ -137,26 +108,16 @@ def _draw_index_field(chart, ax: Axes, layer, cfg):
 
         if profile and profile.labels and levels:
             n_intervals = len(levels) - 1
-            n_labels = len(profile.labels)
-
-            if n_labels == n_intervals:
-                mids = [
-                    0.5 * (levels[i] + levels[i + 1])
-                    for i in range(n_intervals)
-                ]
+            if len(profile.labels) == n_intervals:
+                mids = [0.5 * (levels[i] + levels[i + 1]) for i in range(n_intervals)]
                 cbar.set_ticks(mids)
                 cbar.set_ticklabels(profile.labels)
 
         cbar.set_label(cfg.label or cfg.index)
 
 
-# =============================================================================
-# Index isolines
-# =============================================================================
 def _draw_index_isolines(chart, ax: Axes, layer, cfg) -> None:
-    """
-    Draw contour lines (isolines) of a psychrometric/bioclimatic index.
-    """
+    """Draw contour lines of a psychrometric or bioclimatic index."""
     profile = get_index_profile(cfg.index)
     iso_cfg = (
         cfg.render.isolines
@@ -164,16 +125,9 @@ def _draw_index_isolines(chart, ax: Axes, layer, cfg) -> None:
         else IsolineRenderConfig()
     )
 
-    levels = (
-        iso_cfg.levels
-        or cfg.levels
-        or (profile.levels if profile else None)
-    )
-
+    levels = iso_cfg.levels or cfg.levels or (profile.levels if profile else None)
     if not levels:
         return
-
-    line_color = iso_cfg.color or "black"
 
     cs = ax.contour(
         layer.X,
@@ -182,14 +136,13 @@ def _draw_index_isolines(chart, ax: Axes, layer, cfg) -> None:
         levels=levels,
         linestyles=iso_cfg.style,
         linewidths=iso_cfg.linewidth,
-        colors=line_color,
+        colors=iso_cfg.color or "black",
         alpha=iso_cfg.alpha,
         zorder=ZORDER["isolines"],
     )
 
     if iso_cfg.label:
         template = iso_cfg.label_fmt or "{index} = {value:.0f}"
-
         ax.clabel(
             cs,
             fmt=lambda v: template.format(index=cfg.index, value=v),
@@ -197,70 +150,124 @@ def _draw_index_isolines(chart, ax: Axes, layer, cfg) -> None:
         )
 
 
-# =============================================================================
-# Index zones
-# =============================================================================
-def _draw_index_zone(chart, ax: Axes, zone):
-    index_cls = _resolve_index(zone.index)
+def _index_zone_mask(layer, zone) -> np.ndarray:
+    """Return the finite boolean mask selected by an index-zone interval."""
+    lower, upper = zone.range
+    return np.isfinite(layer.Z) & (layer.Z >= lower) & (layer.Z <= upper)
 
-    try:
-        layer = build_index_field(index_cls, chart.cfg, chart.psych)
-    except ValueError:
+
+def _index_zone_facecolor(zone) -> str:
+    """Return the fill color for an index zone."""
+    return zone.facecolor or zone.color or "gray"
+
+
+def _index_zone_label_position(chart, zone, layer, mask: np.ndarray) -> tuple[float, float] | None:
+    """Return a chart-coordinate label position for an index-derived zone."""
+    if zone.label_t is not None and zone.label_rh is not None:
+        label_w = chart.psych.humidity_ratio(zone.label_t, zone.label_rh, chart.cfg.pressure)
+        return float(zone.label_t), float(label_w)
+
+    if zone.label_position == "manual":
+        return None
+
+    x_vals = layer.X[mask]
+    y_vals = layer.Y[mask]
+
+    if x_vals.size == 0:
+        return None
+
+    x0 = float(np.nanmedian(x_vals))
+    y0 = float(np.nanmedian(y_vals))
+    dist2 = (x_vals - x0) ** 2 + (y_vals - y0) ** 2
+    i = int(np.nanargmin(dist2))
+
+    return float(x_vals[i]), float(y_vals[i])
+
+
+def _draw_index_zone_label(ax: Axes, chart, zone, layer, mask: np.ndarray) -> None:
+    """Draw an optional label inside an index-derived region."""
+    if not zone.show_label:
         return
 
-    if not hasattr(zone, "range") or len(zone.range) != 2:
-        raise ValueError(f"Invalid zone range for index '{zone.index}'")
+    text = zone.label or zone.name
+    if not text:
+        return
 
-    mask = (layer.Z >= zone.range[0]) & (layer.Z <= zone.range[1])
+    position = _index_zone_label_position(chart, zone, layer, mask)
+    if position is None:
+        return
+
+    bbox = zone.label_bbox
+    if bbox is None:
+        bbox = {
+            "boxstyle": "round,pad=0.20",
+            "facecolor": "white",
+            "edgecolor": "none",
+            "alpha": 0.0,
+        }
+
+    ax.annotate(
+        text,
+        xy=position,
+        ha="center",
+        va="center",
+        color=zone.label_color or zone.edgecolor or zone.color or "black",
+        fontsize=zone.label_fontsize,
+        fontweight=zone.label_fontweight,
+        rotation=zone.label_rotation,
+        bbox=bbox,
+        zorder=ZORDER["zone_edge"] + 1,
+    )
+
+
+def _draw_index_zone(chart, ax: Axes, zone) -> None:
+    """Draw a filled and optionally labeled region derived from an index interval."""
+    _, layer = _get_index_layer(chart, zone.index)
+    if layer is None:
+        return
+
+    mask = _index_zone_mask(layer, zone)
+    if not np.any(mask):
+        return
+
+    mask_field = np.where(mask, 1.0, np.nan)
 
     ax.contourf(
         layer.X,
         layer.Y,
-        mask,
-        levels=[0.5, 1],
-        colors=[zone.color],
+        mask_field,
+        levels=[0.5, 1.5],
+        colors=[_index_zone_facecolor(zone)],
         alpha=zone.alpha,
         zorder=ZORDER["index_zone"],
     )
 
-    if not hasattr(chart, "_index_zone_counter"):
-        chart._index_zone_counter = 0
+    if zone.edgecolor and zone.linewidth > 0:
+        ax.contour(
+            layer.X,
+            layer.Y,
+            mask.astype(float),
+            levels=[0.5],
+            colors=[zone.edgecolor],
+            linewidths=zone.linewidth,
+            zorder=ZORDER["zone_edge"],
+        )
 
-    ax.text(
-        0.01,
-        0.99 - 0.05 * chart._index_zone_counter,
-        f"{zone.index}: {zone.name}",
-        transform=ax.transAxes,
-        fontsize=9,
-        verticalalignment="top",
-        zorder=ZORDER["zone_edge"],
-    )
-
-    chart._index_zone_counter += 1
+    _draw_index_zone_label(ax, chart, zone, layer, mask)
 
 
 def _draw_operational_overlays(chart, ax: Axes) -> None:
-    """
-    Draw all configured operational overlays.
-
-    Operational overlays are intentionally dispatched from the index rendering
-    stage because they are gridded semantic fields over the same psychrometric
-    domain as ITU/HLI/BGHI fields. Their z-order remains fully controlled by the
-    overlay configuration, so they can be placed behind or above index fields.
-    """
+    """Draw all configured operational overlays."""
     overlays = getattr(chart, "operational_overlays", None) or []
 
     for overlay_cfg in overlays:
         draw_operational_zones(ax, chart, overlay_cfg)
 
 
-# =============================================================================
-# Public dispatchers
-# =============================================================================
 def draw_indexes(chart, ax):
+    """Draw all configured index fields and isolines."""
     for cfg in chart.indexes:
-        index_cls, layer = _get_index_layer(chart, cfg.index)
-
+        _, layer = _get_index_layer(chart, cfg.index)
         if layer is None:
             continue
 
@@ -274,6 +281,7 @@ def draw_indexes(chart, ax):
 
 
 def draw_index_zones(chart, ax: Axes) -> None:
+    """Draw all configured index-derived zones."""
     if not getattr(chart, "index_zones", None):
         return
 
