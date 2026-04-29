@@ -1,0 +1,79 @@
+# -----------------------------------------------------------------------------
+# ITU-derived labeled zone
+# -----------------------------------------------------------------------------
+# This example shows how to paint a psychrometric region from an interval of a
+# computed index. Unlike a geometric `zones` polygon, this region is derived
+# from the ITU scalar field itself: every physically valid point where
+# 68 <= ITU <= 72 is filled and labeled inside the chart.
+# -----------------------------------------------------------------------------
+
+chart:
+  t_min: 10
+  t_max: 45
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg dry air)"
+  title: "Psychrometric chart with labeled ITU-derived zone"
+  output: "index_zone_itu_labeled.png"
+  dpi: 300
+  figsize: [16, 9]
+
+  show_tw_grid: true
+  tw_grid_style:
+    color: "#8a8a8a"
+    linewidth: 0.45
+    linestyle: "-"
+    alpha: 0.22
+
+isolines:
+  relative_humidity:
+    enabled: true
+    values: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    color: "#555555"
+    linestyle: "--"
+    linewidth: 0.7
+    alpha: 0.55
+    labels: true
+    label_fontsize: 7
+    label_fmt: "{value:.0%}"
+
+indexes:
+  - index: ITU
+    label: "Temperature-Humidity Index (ITU)"
+    render:
+      isolines:
+        levels: [68, 72, 78, 84]
+        style: "-"
+        color: "#111111"
+        linewidth: 0.9
+        alpha: 0.85
+        label: true
+        label_fontsize: 8
+        label_fmt: "ITU {value:.0f}"
+
+index_zones:
+  - index: ITU
+    name: "ITU comfort zone"
+    range: [68, 72]
+
+    facecolor: "#A8E67A"
+    edgecolor: "#5B8F3A"
+    alpha: 0.38
+    linewidth: 1.1
+
+    show_label: true
+    label: "ITU"
+    label_position: auto
+    label_color: "#2F3A2F"
+    label_fontsize: 12
+    label_fontweight: "bold"
+    label_rotation: 72
+
+zones: []
+points: []
+data_layers: []
+observations: []
+temporal_overlays: []
