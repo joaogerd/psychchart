@@ -73,6 +73,71 @@ def _get_index_layer(chart, index):
     return index_cls, layer
 
 
+def _resolve_field_label_position(position, fallback_label: str) -> tuple[float | None, float | None, str, float | None]:
+    """
+    Normalize one manual label position.
+    """
+    x = position.x if position.x is not None else position.t
+    y = position.y if position.y is not None else position.w
+    label = position.label or fallback_label
+    return x, y, label, position.rotation
+
+
+def _draw_index_field_labels(ax: Axes, field_cfg, levels, labels) -> None:
+    """
+    Draw semantic class labels inside the psychrometric diagram.
+    """
+    if not field_cfg.labels or not levels or not labels:
+        return
+
+    n_intervals = len(levels) - 1
+    if len(labels) != n_intervals:
+        return
+
+    fontsize = field_cfg.label_fontsize or 24.0
+    color = field_cfg.label_color or "black"
+    alpha = field_cfg.label_alpha if field_cfg.label_alpha is not None else 0.82
+    fontweight = field_cfg.label_fontweight or "normal"
+    default_rotation = field_cfg.label_rotation if field_cfg.label_rotation is not None else -18.0
+    zorder = ZORDER["index_field"] + 0.5
+
+    manual_positions = field_cfg.label_positions or []
+
+    for i, label in enumerate(labels):
+        x = None
+        y = None
+        rotation = default_rotation
+
+        if i < len(manual_positions):
+            x, y, label, manual_rotation = _resolve_field_label_position(
+                manual_positions[i],
+                label,
+            )
+            if manual_rotation is not None:
+                rotation = manual_rotation
+
+        if x is None:
+            x = 0.5 * (levels[i] + levels[i + 1])
+
+        if y is None:
+            y_min, y_max = ax.get_ylim()
+            y = y_min + (0.22 + 0.18 * (i % 2)) * (y_max - y_min)
+
+        ax.text(
+            x,
+            y,
+            label,
+            fontsize=fontsize,
+            color=color,
+            alpha=alpha,
+            fontweight=fontweight,
+            rotation=rotation,
+            ha="center",
+            va="center",
+            zorder=zorder,
+        )
+
+
 # =============================================================================
 # Continuous index fields (heatmaps)
 # =============================================================================
@@ -133,6 +198,8 @@ def _draw_index_field(chart, ax: Axes, layer, cfg):
             alpha=field_cfg.alpha,
             zorder=ZORDER["index_field"],
         )
+
+    _draw_index_field_labels(ax, field_cfg, levels, labels)
 
     if field_cfg.colorbar:
         cbar = chart.fig.colorbar(artist, ax=ax)
