@@ -20,6 +20,7 @@ from matplotlib.axes import Axes
 from matplotlib.patches import PathPatch
 from matplotlib.colors import ListedColormap, BoundaryNorm, Normalize
 
+from psychchart.config.indexes import FieldRenderConfig, IsolineRenderConfig
 from psychchart.render.build_index_field import build_index_field
 from psychchart.plot.index_profiles import get_index_profile
 from psychchart.indexes.registry import INDEX_REGISTRY
@@ -87,7 +88,8 @@ def _draw_index_field(chart, ax: Axes, layer, cfg):
     )
 
     levels = cfg.levels or (profile.levels if profile else None)
-    colors = profile.colors if profile else None
+    colors = cfg.colors or (profile.colors if profile else None)
+    labels = cfg.labels or (profile.labels if profile else None)
 
     cmap = None
     norm = None
@@ -135,9 +137,9 @@ def _draw_index_field(chart, ax: Axes, layer, cfg):
     if field_cfg.colorbar:
         cbar = chart.fig.colorbar(artist, ax=ax)
 
-        if profile and profile.labels and levels:
+        if labels and levels:
             n_intervals = len(levels) - 1
-            n_labels = len(profile.labels)
+            n_labels = len(labels)
 
             if n_labels == n_intervals:
                 mids = [
@@ -145,7 +147,7 @@ def _draw_index_field(chart, ax: Axes, layer, cfg):
                     for i in range(n_intervals)
                 ]
                 cbar.set_ticks(mids)
-                cbar.set_ticklabels(profile.labels)
+                cbar.set_ticklabels(labels)
 
         cbar.set_label(cfg.label or cfg.index)
 
