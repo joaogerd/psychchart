@@ -21,6 +21,7 @@ from matplotlib.patches import PathPatch
 from matplotlib.colors import ListedColormap, BoundaryNorm, Normalize
 
 from psychchart.config.indexes import FieldRenderConfig, IsolineRenderConfig
+from psychchart.psychrometrics import Psychrometrics
 from psychchart.render.build_index_field import build_index_field
 from psychchart.plot.index_profiles import get_index_profile
 from psychchart.indexes.registry import INDEX_REGISTRY
@@ -71,6 +72,135 @@ def _get_index_layer(chart, index):
     chart._index_cache[index] = layer
 
     return index_cls, layer
+
+
+def _normalize_rh(rh: float | None) -> float | None:
+    """
+    Normalize relative humidity from fraction or percent to fraction.
+    """
+    if rh is None:
+        return None
+    return rh / 100.0 if rh > 1.0 else rh
+
+
+def _resolve_field_label_position(
+    position,
+    fallback_label: str,
+    pressure: float,
+) -> tuple[float | None, float | None, str, float | None]:
+    """
+    Normalize one manual label position.
+
+    Supported coordinate forms are:
+    - ``x``/``y``: raw chart coordinates, equivalent to T/W;
+    - ``t``/``w``: dry-bulb temperature and humidity ratio;
+    - ``t``/``rh``: dry-bulb temperature and relative humidity.
+    """
+    x = position.x if position.x is not None else position.t
+    y = position.y if position.y is not None else position.w
+
+    if y is None and position.t is not None and position.rh is not None:
+        rh = _normalize_rh(position.rh)
+        y = Psychrometrics.humidity_ratio(position.t, rh, pressure)
+
+    label = position.label or fallback_label
+    return x, y, label, position.rotation
+
+
+def _auto_field_label_position(ax: Axes, layer, lower: float, upper: float) -> tuple[float | None, float | None]:
+    """
+    Estimate an in-domain label position for one index-value interval.
+
+    The interval bounds are index values, not plot coordinates. Therefore the
+    position is computed from the centroid of the corresponding mask in the
+    psychrometric grid.
+    """
+    x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
+
+    mask = (
+        np.isfinite(layer.Z)
+        & (layer.Z >= lower)
+        & (layer.Z < upper)
+        & np.isfinite(layer.X)
+        & np.isfinite(layer.Y)
+        & (layer.X >= x_min)
+        & (layer.X <= x_max)
+        & (layer.Y >= y_min)
+        & (layer.Y <= y_max)
+    )
+
+    if not np.any(mask):
+        return None, None
+
+    x_values = layer.X[mask]
+    y_values = layer.Y[mask]
+
+    return float(np.nanmedian(x_values)), float(np.nanmedian(y_values))
+
+
+def _draw_index_field_labels(ax: Axes, layer, field_cfg, levels, labels, pressure: float) -> None:
+    """
+    Draw semantic class labels inside the psychrometric diagram.
+    """
+    if not field_cfg.labels or not levels or not labels:
+        return
+
+    n_intervals = len(levels) - 1
+    if len(labels) != n_intervals:
+        return
+
+    fontsize = field_cfg.label_fontsize or 24.0
+    color = field_cfg.label_color or "black"
+    alpha = field_cfg.label_alpha if field_cfg.label_alpha is not None else 0.82
+    fontweight = field_cfg.label_fontweight or "normal"
+    default_rotation = field_cfg.label_rotation if field_cfg.label_rotation is not None else -18.0
+    zorder = ZORDER["index_field"] + 0.5
+
+    manual_positions = field_cfg.label_positions or []
+
+    for i, label in enumerate(labels):
+        x = None
+        y = None
+        rotation = default_rotation
+
+        if i < len(manual_positions):
+            x, y, label, manual_rotation = _resolve_field_label_position(
+                manual_positions[i],
+                label,
+                pressure,
+            )
+            if manual_rotation is not None:
+                rotation = manual_rotation
+
+        if x is None or y is None:
+            auto_x, auto_y = _auto_field_label_position(
+                ax,
+                layer,
+                levels[i],
+                levels[i + 1],
+            )
+            if x is None:
+                x = auto_x
+            if y is None:
+                y = auto_y
+
+        if x is None or y is None:
+            continue
+
+        ax.text(
+            x,
+            y,
+            label,
+            fontsize=fontsize,
+            color=color,
+            alpha=alpha,
+            fontweight=fontweight,
+            rotation=rotation,
+            ha="center",
+            va="center",
+            zorder=zorder,
+        )
 
 
 # =============================================================================
@@ -133,6 +263,8 @@ def _draw_index_field(chart, ax: Axes, layer, cfg):
             alpha=field_cfg.alpha,
             zorder=ZORDER["index_field"],
         )
+
+    _draw_index_field_labels(ax, layer, field_cfg, levels, labels, chart.cfg.pressure)
 
     if field_cfg.colorbar:
         cbar = chart.fig.colorbar(artist, ax=ax)

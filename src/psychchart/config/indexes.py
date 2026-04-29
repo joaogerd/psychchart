@@ -5,10 +5,10 @@ This module defines typed configuration models used to describe computed
 psychrometric or thermal indexes.
 
 Index configuration is split into semantic settings (``levels``, ``colors`` and
-``labels``) and rendering settings (field opacity, colorbar visibility and
-isoline style). This lets packaged profiles provide defaults while allowing a
-user YAML file to override the semantic representation without changing Python
-code.
+``labels``) and rendering settings (field opacity, colorbar visibility, in-chart
+label visibility and isoline style). This lets packaged profiles provide
+defaults while allowing a user YAML file to override the semantic
+representation without changing Python code.
 """
 
 from __future__ import annotations
@@ -20,11 +20,37 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .base import StrictModel
 
 
+class FieldLabelPosition(StrictModel):
+    """Manual position for one in-chart field label.
+
+    Positions may be declared directly in chart coordinates ``T x W`` using
+    ``t``/``w`` or in the more intuitive ``T x RH`` form using ``t``/``rh``.
+    Relative humidity may be provided either as a fraction in ``[0, 1]`` or as
+    a percentage in ``[0, 100]``.
+    """
+
+    label: Optional[str] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
+    t: Optional[float] = None
+    w: Optional[float] = None
+    rh: Optional[float] = None
+    rotation: Optional[float] = None
+
+
 class FieldRenderConfig(StrictModel):
     """Rendering options for a continuous index field."""
 
     alpha: Optional[float] = None
     colorbar: Optional[bool] = None
+
+    labels: Optional[bool] = None
+    label_fontsize: Optional[float] = None
+    label_color: Optional[str] = None
+    label_alpha: Optional[float] = None
+    label_fontweight: Optional[str] = None
+    label_rotation: Optional[float] = None
+    label_positions: Optional[List[FieldLabelPosition]] = None
 
 
 class IsolineRenderConfig(StrictModel):
@@ -61,10 +87,18 @@ class IndexConfig(BaseModel):
             render:
               field:
                 alpha: 0.65
-                colorbar: true
+                colorbar: false
+                labels: true
+                label_fontsize: 24
+                label_rotation: -18
+                label_positions:
+                  - label: "Comfort"
+                    t: 14
+                    rh: 60
 
     ``levels``, ``colors`` and ``labels`` are index semantics. They do not live
-    under ``render.field``.
+    under ``render.field``. The nested ``render.field.labels`` flag only controls
+    whether those semantic labels are drawn inside the diagram.
     """
 
     model_config = ConfigDict(
