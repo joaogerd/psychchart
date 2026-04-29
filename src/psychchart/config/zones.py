@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from .base import StrictModel
 from .utils import normalize_rh
@@ -116,15 +116,104 @@ class Zone(StrictModel):
 
 class IndexZone(StrictModel):
     """
-    Definition of a semantic zone derived from an index range.
+    Definition of a semantic zone derived from an index interval.
 
-    This model describes regions obtained from intervals of a computed scalar
-    index such as ITU, THI, HLI, or another registered indicator.
+    An index zone represents the subset of the psychrometric domain where a
+    computed scalar index lies within a prescribed numerical interval. It is
+    therefore different from a geometric :class:`Zone`: its shape is not
+    declared by vertices, but derived from the index field evaluated over the
+    physically valid chart domain.
+
+    Parameters
+    ----------
+    index : str
+        Registered index name, for example ``ITU`` or ``HLI``.
+    name : str
+        Semantic identifier and default label text.
+    range : tuple of float
+        Closed numerical interval ``[min, max]`` used to select the index
+        region to be filled.
+    color : str, optional
+        Legacy fill color alias preserved for older YAML files.
+    facecolor : str, optional
+        Fill color. Takes precedence over ``color`` when provided.
+    edgecolor : str, optional
+        Optional contour color for the selected index interval.
+    linewidth : float, default=0.0
+        Optional contour-line width. Set to zero to disable the outline.
+    alpha : float, default=0.3
+        Fill opacity.
+    show_label : bool, default=False
+        Whether to draw a label inside the index-derived region.
+    label : str, optional
+        Text drawn inside the region. If omitted, ``name`` is used.
+    label_position : str, default="auto"
+        Label placement strategy. ``auto`` estimates a representative internal
+        point from the selected mask. ``manual`` requires ``label_t`` and
+        ``label_rh``.
+    label_t, label_rh : float, optional
+        Manual label position in ``(T, RH)`` coordinates. ``label_rh`` accepts
+        either fraction or percent and is normalized to fraction internally.
+    label_color : str, optional
+        Text color. Defaults to ``edgecolor`` or ``color`` when omitted.
+    label_fontsize : float, default=9.0
+        Label font size.
+    label_fontweight : str, optional
+        Matplotlib-compatible text weight, for example ``bold``.
+    label_rotation : float, default=0.0
+        Label rotation in degrees.
+    label_bbox : dict, optional
+        Matplotlib-compatible annotation bounding-box dictionary.
+    parameters : dict, optional
+        Reserved for parameterized index definitions.
     """
 
     index: str
     name: str
     range: Tuple[float, float]
+
     color: str = "gray"
+    facecolor: Optional[str] = None
+    edgecolor: Optional[str] = None
+    linewidth: float = 0.0
     alpha: float = 0.3
+
+    show_label: bool = False
+    label: Optional[str] = None
+    label_position: str = "auto"
+    label_t: Optional[float] = None
+    label_rh: Optional[float] = None
+    label_color: Optional[str] = None
+    label_fontsize: float = 9.0
+    label_fontweight: Optional[str] = None
+    label_rotation: float = 0.0
+    label_bbox: Optional[Dict[str, Any]] = None
+
     parameters: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("label_rh", mode="before")
+    @classmethod
+    def validate_label_rh(cls, value: Any) -> float | None:
+        """Normalize optional label relative humidity to fraction."""
+        if value is None:
+            return value
+        return normalize_rh(value)
+
+    @model_validator(mode="after")
+    def validate_range_and_label(self) -> "IndexZone":
+        """Validate interval ordering and manual label placement."""
+        lower, upper = self.range
+        if lower >= upper:
+            raise ValueError("IndexZone 'range' must satisfy lower < upper")
+
+        if self.label_position not in {"auto", "manual"}:
+            raise ValueError("IndexZone 'label_position' must be 'auto' or 'manual'")
+
+        if self.label_position == "manual" and (
+            self.label_t is None or self.label_rh is None
+        ):
+            raise ValueError(
+                "Manual IndexZone label placement requires both 'label_t' and 'label_rh'"
+            )
+
+        return self
