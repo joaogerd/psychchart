@@ -42,6 +42,28 @@ export async function renderChart({ yaml, format = 'png', dpi = 180, apiBaseUrl 
   );
 }
 
+export async function exportChartFile({ yaml, format = 'png', dpi = 300, apiBaseUrl = DEFAULT_API_BASE_URL }) {
+  const response = await fetch(`${apiBaseUrl}/render/file`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ yaml, format, dpi }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  return response.blob();
+}
+
+export async function computeReadout({ T, RH_pct, pressure = 101325 }) {
+  return requestJson('/readout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ T, RH_pct, pressure }),
+  });
+}
+
 export async function listProjects() {
   return requestJson('/projects');
 }
