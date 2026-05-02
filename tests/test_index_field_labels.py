@@ -229,3 +229,35 @@ indexes:
         assert "Stress" not in rendered
     finally:
         plt.close(chart.fig)
+
+
+def test_inconsistent_index_field_labels_emit_warning_and_are_skipped(tmp_path):
+    """Mismatched semantic labels should warn instead of failing silently."""
+    yaml = """
+chart:
+  t_min: 10
+  t_max: 42
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+
+indexes:
+  - index: ITU
+    levels: [50, 63, 75, 79]
+    colors: ["#1a9850", "#fee08b", "#fdae61"]
+    labels: ["Comfort", "Alert"]
+    render:
+      field:
+        alpha: 0.70
+        colorbar: false
+        labels: true
+"""
+    with pytest.warns(UserWarning, match="number of labels"):
+        chart = _render_from_yaml(tmp_path, yaml)
+
+    try:
+        rendered = {text.get_text() for text in chart.ax.texts}
+        assert "Comfort" not in rendered
+        assert "Alert" not in rendered
+    finally:
+        plt.close(chart.fig)
