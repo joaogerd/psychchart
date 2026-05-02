@@ -56,6 +56,55 @@ This allows:
 
 ---
 
+## Index field labels
+
+Continuous index fields can display their semantic class labels directly inside the psychrometric diagram. The index semantics remain defined at the index level through `levels`, `colors`, and `labels`; the nested `render.field.labels` option only controls whether those labels are drawn inside the field.
+
+```yaml
+indexes:
+  - index: ITU
+    label: "Temperature-Humidity Index (ITU)"
+    levels: [50, 63, 75, 79]
+    colors: ["#1a9850", "#fee08b", "#fdae61"]
+    labels: ["Comfort", "Alert", "Stress"]
+    render:
+      field:
+        alpha: 0.70
+        colorbar: false
+        labels: true
+        label_fontsize: 22
+        label_color: "#222222"
+        label_alpha: 0.85
+        label_fontweight: bold
+        label_rotation: -15
+```
+
+Manual positions may be declared either in chart coordinates (`t`/`w`) or in the more intuitive dry-bulb temperature and relative humidity form (`t`/`rh`). Relative humidity accepts both fractions and percentages.
+
+```yaml
+render:
+  field:
+    labels: true
+    label_positions:
+      - label: "Comfort"
+        t: 18
+        rh: 60
+      - label: "Alert"
+        t: 26
+        rh: 0.70
+      - label: "Stress"
+        t: 34
+        w: 0.020
+```
+
+A complete example is available at:
+
+```bash
+psychchart examples/itu_field_labels.yaml
+```
+
+---
+
 ## API usage
 
 ### Render chart (JSON)
