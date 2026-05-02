@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.0.1] - 2026-05-01
+
+### Added
+- Bovine bioclimatic chart concept documentation.
+- Final Azevedo et al. (2005) bovine bioclimatic chart example combining psychrometrics, ITU field, ITU isolines, experimental T x RH envelopes, CTA-classified trajectory, and accumulated-load legend.
+- Semantic labels rendered directly inside continuous index fields.
+- Configurable in-field index label styling and manual label positions using T/W or T/RH coordinates.
+- Operational overlay layer for management-action fields over psychrometric space.
+- Built-in `dairy_cooling_default` operational profile for routine dairy-cattle cooling examples.
+- Minimal operational overlay example: `examples/operational_overlay_minimal.yaml`.
+- Validated YAML example smoke-test set covering core, path, bioclimatic and operational examples.
+- Small deterministic example dataset at `examples/data/observations.csv`.
+- Operational overlay documentation and smoke tests.
+
+### Changed
+- Operational overlays now render from the declarative `OperationalProfile` and `psychchart.operations.engine.action` decision engine.
+- Operational overlay colors, labels, legends and colorbars now come from profile-defined `action_styles`.
+- Static overlay `trend` values are converted into representative `dca_dt` values so the same decision engine can support static overlays and future time-series diagnostics.
+- Operational overlays are rendered as clean classified contour regions instead of raster-like quadrilateral meshes.
+- `thermal_trajectory_classified.yaml` now uses the built-in dairy operational profile by default.
+- Runtime payload now carries operational profiles and overlays to the plotting layer.
+- Public YAML examples were normalized and documented for execution from the repository root.
+- Zone labels support fractional Matplotlib font sizes.
+- Runtime dependencies now explicitly include `pandas` and `pydantic>=2`; `pyarrow` is declared as an optional parquet extra.
+
+### Fixed
+- Optional operational modifiers with explicit `None` values are now safely ignored.
+- Operational overlays now use the registered ITU implementation instead of the obsolete experimental domain engine.
+- Operational overlays now resolve humidity ratio through the current psychrometric API.
+- Index field labels now warn when the number of labels does not match the number of level intervals instead of failing silently.
+- Example data paths were normalized to tracked files under `examples/data/`.
+- YAML examples using `animal_day.csv` now use RH auto-detection when the CSV stores RH as percentages.
+- Missing `examples/data/observations.csv` was added so data-layer examples render reproducibly.
+
 ## [1.0.0] - 2026-04-26
 
 ### Added
@@ -30,28 +64,6 @@
 
 ### Fixed
 - Reduced duplication between app and core logic
-
-## [Unreleased]
-### Added
-- Bovine bioclimatic chart concept documentation.
-- Final Azevedo et al. (2005) bovine bioclimatic chart example combining psychrometrics, ITU field, ITU isolines, experimental T x RH envelopes, CTA-classified trajectory, and accumulated-load legend.
-- Operational overlay layer for management-action fields over psychrometric space.
-- Built-in `dairy_cooling_default` operational profile for routine dairy-cattle cooling examples.
-- Operational overlay documentation and smoke tests.
-- Smoke tests for bovine bioclimatic examples.
-
-### Changed
-- Operational overlays are rendered as clean classified contour regions instead of raster-like quadrilateral meshes.
-- `thermal_trajectory_classified.yaml` now uses the built-in dairy operational profile by default.
-- Runtime payload now carries operational profiles and overlays to the plotting layer.
-- Zone labels support fractional Matplotlib font sizes.
-- Runtime dependencies now explicitly include `pandas` and `pydantic>=2`; `pyarrow` is declared as an optional parquet extra.
-
-### Fixed
-- Optional operational modifiers with explicit `None` values are now safely ignored.
-- Operational overlays now use the registered ITU implementation instead of the obsolete experimental domain engine.
-- Operational overlays now resolve humidity ratio through the current psychrometric API.
-- Example data paths were normalized to tracked files under `examples/data/`.
 
 ## [0.3.0] - 2026-02-15
 ### Added
