@@ -15,13 +15,16 @@ from matplotlib.axes import Axes
 from matplotlib.colors import BoundaryNorm, ListedColormap
 from matplotlib.patches import Patch
 
-from psychchart.config.operations import OperationalOverlayConfig
+from psychchart.config.operations import (
+    DEFAULT_DAIRY_OPERATIONAL_PROFILE_NAME,
+    OperationalOverlayConfig,
+)
 from psychchart.indexes.itu import ITU
-from psychchart.operations.management_engine import (
-    ACTIONS,
-    action_colors,
-    action_labels,
-    classify_management,
+from psychchart.operations.engine import action
+from psychchart.operations.enums import OperationalAction
+from psychchart.operations.profile import (
+    DEFAULT_DAIRY_COOLING_PROFILE,
+    OperationalProfile,
 )
 from psychchart.psychrometrics import Psychrometrics
 
@@ -93,35 +96,82 @@ def _trend_name(value: str) -> str:
     return str(value).lower()
 
 
-def _representative_cta(chart, cfg: OperationalOverlayConfig) -> float:
+def _trend_to_dca_dt(value: str) -> float:
     """
-    Resolve representative CTA from overlay load class.
+    Convert a static overlay trend name into a representative dCA/dt value.
 
-    The interactive overlay uses a static psychrometric field. Since a true CTA
-    is temporal, this value represents the selected accumulated-load class for
-    the whole field. It keeps the operational surface explicitly tied to load
-    class while avoiding hidden time integration inside the renderer.
+    Operational overlays are static psychrometric projections. The trend cannot
+    be inferred from a time series at this layer, so the configured trend is
+    represented by a small deterministic derivative that activates the profile
+    modifiers when appropriate.
     """
-    profile_name = getattr(cfg, "profile", "default")
-    load_class = getattr(cfg, "load_class", "A2")
+    trend = _trend_name(value)
+    if trend == "rising":
+        return 0.002
+    if trend == "falling":
+        return -0.002
+    return 0.0
+
+
+def _resolve_operational_profile(
+    chart,
+    cfg: OperationalOverlayConfig,
+) -> OperationalProfile:
+    """Resolve the runtime operational profile referenced by an overlay."""
+    profile_name = getattr(cfg, "profile", DEFAULT_DAIRY_OPERATIONAL_PROFILE_NAME)
     profiles = getattr(chart, "operational_profiles", {}) or {}
     profile_cfg = profiles.get(profile_name)
 
     if profile_cfg is not None:
-        try:
-            runtime = profile_cfg.to_runtime()
-            return float(runtime.get_load_class(load_class).representative_value())
-        except Exception:
-            pass
+        return profile_cfg.to_runtime()
 
-    fallback = {
-        "A0": 0.0,
-        "A1": 10.0,
-        "A2": 30.0,
-        "A3": 60.0,
-        "A4": 90.0,
-    }
-    return fallback.get(str(load_class), 30.0)
+    if profile_name == DEFAULT_DAIRY_OPERATIONAL_PROFILE_NAME:
+        return DEFAULT_DAIRY_COOLING_PROFILE
+
+    raise KeyError(f"Unknown operational profile: {profile_name!r}")
+
+
+def _representative_cta(profile: OperationalProfile, cfg: OperationalOverlayConfig) -> float:
+    """
+    Resolve representative CTA from the selected overlay load class.
+
+    The interactive overlay uses a static psychrometric field. Since true CTA is
+    temporal, this value represents the selected accumulated-load class for the
+    whole field. It keeps the operational surface explicitly tied to load class
+    without hiding time integration inside the renderer.
+    """
+    load_class = getattr(cfg, "load_class", "A2")
+    return float(profile.get_load_class(load_class).representative_value())
+
+
+def _classify_grid_with_profile(
+    profile: OperationalProfile,
+    T_grid: np.ndarray,
+    RH_grid: np.ndarray,
+    ITU_grid: np.ndarray,
+    *,
+    ca: float,
+    dca_dt: float,
+) -> np.ndarray:
+    """Evaluate the declarative operational engine over a grid."""
+    flat_actions = [
+        int(
+            action(
+                profile,
+                T=float(T),
+                RH=float(RH),
+                itu=float(itu),
+                ca=ca,
+                dca_dt=dca_dt,
+            )
+        )
+        for T, RH, itu in zip(
+            T_grid.ravel(),
+            RH_grid.ravel(),
+            ITU_grid.ravel(),
+        )
+    ]
+    return np.asarray(flat_actions, dtype=int).reshape(T_grid.shape)
 
 
 def _build_management_field(
@@ -132,6 +182,10 @@ def _build_management_field(
     n_t = int(getattr(cfg, "n_t", 220))
     n_rh = int(getattr(cfg, "n_rh", 180))
 
+    profile = _resolve_operational_profile(chart, cfg)
+    ca = _representative_cta(profile, cfg)
+    dca_dt = _trend_to_dca_dt(getattr(cfg, "trend", "steady"))
+
     t_values = np.linspace(chart.cfg.t_min, chart.cfg.t_max, n_t)
     rh_values = np.linspace(0.0, 1.0, n_rh)
     T_grid, RH_grid = np.meshgrid(t_values, rh_values)
@@ -140,13 +194,13 @@ def _build_management_field(
     W_grid = np.asarray(humidity_ratio_evaluator(T_grid, RH_grid), dtype=float)
     ITU_grid = np.asarray(_default_itu_evaluator(T_grid, RH_grid), dtype=float)
 
-    CTA_grid = np.full_like(ITU_grid, _representative_cta(chart, cfg), dtype=float)
-    action_grid = classify_management(
+    action_grid = _classify_grid_with_profile(
+        profile,
         T_grid,
         RH_grid,
         ITU_grid,
-        CTA_grid,
-        trend=_trend_name(getattr(cfg, "trend", "steady")),
+        ca=ca,
+        dca_dt=dca_dt,
     )
 
     mask = ~np.isfinite(W_grid)
@@ -157,31 +211,39 @@ def _build_management_field(
     if y_max is not None:
         mask |= W_grid > y_max
 
-    return T_grid, W_grid, np.ma.masked_array(action_grid, mask=mask)
+    return T_grid, W_grid, np.ma.masked_array(action_grid, mask=mask), profile
 
 
-def _build_action_colormap():
-    """Build categorical colormap and norm for management actions."""
-    colors = action_colors()
-    ordered_codes = [action.code for action in ACTIONS]
-    cmap = ListedColormap([colors[code] for code in ordered_codes])
-    levels = np.arange(-0.5, len(ordered_codes) + 0.5, 1.0)
+def _ordered_actions() -> list[OperationalAction]:
+    """Return operational actions in their semantic severity order."""
+    return list(OperationalAction)
+
+
+def _build_action_colormap(profile: OperationalProfile):
+    """Build categorical colormap and norm for profile-defined actions."""
+    ordered_actions = _ordered_actions()
+    cmap = ListedColormap(
+        [profile.action_styles[action].facecolor for action in ordered_actions]
+    )
+    levels = np.arange(-0.5, len(ordered_actions) + 0.5, 1.0)
     norm = BoundaryNorm(levels, cmap.N)
     return cmap, norm, levels
 
 
-def _legend_handles():
-    """Build proxy legend handles for management actions."""
-    labels = action_labels()
-    colors = action_colors()
-    return [
-        Patch(
-            facecolor=colors[action.code],
-            edgecolor="black",
-            label=labels[action.code],
+def _legend_handles(profile: OperationalProfile):
+    """Build proxy legend handles for profile-defined operational actions."""
+    handles = []
+    for action_code in _ordered_actions():
+        style = profile.action_styles[action_code]
+        handles.append(
+            Patch(
+                facecolor=style.facecolor,
+                edgecolor=style.edgecolor if style.edgecolor != "none" else "black",
+                hatch=style.hatch,
+                label=style.label,
+            )
         )
-        for action in ACTIONS
-    ]
+    return handles
 
 
 def draw_operational_zones(
@@ -190,8 +252,8 @@ def draw_operational_zones(
     cfg: OperationalOverlayConfig,
 ) -> None:
     """Draw one bovine thermal-management overlay."""
-    T_grid, W_grid, action_grid = _build_management_field(chart, cfg)
-    cmap, norm, levels = _build_action_colormap()
+    T_grid, W_grid, action_grid, profile = _build_management_field(chart, cfg)
+    cmap, norm, levels = _build_action_colormap(profile)
 
     artist = ax.contourf(
         T_grid,
@@ -210,7 +272,7 @@ def draw_operational_zones(
             T_grid,
             W_grid,
             action_grid,
-            levels=np.arange(0.5, len(ACTIONS), 1.0),
+            levels=np.arange(0.5, len(_ordered_actions()), 1.0),
             colors=cfg.boundary_color,
             linewidths=cfg.boundary_linewidth,
             alpha=cfg.boundary_alpha,
@@ -219,13 +281,15 @@ def draw_operational_zones(
 
     if cfg.show_colorbar:
         cbar = plt.colorbar(artist, ax=ax, pad=0.02)
-        cbar.set_ticks(np.arange(len(ACTIONS)))
-        cbar.set_ticklabels([action.label for action in ACTIONS])
+        cbar.set_ticks([int(action_code) for action_code in _ordered_actions()])
+        cbar.set_ticklabels(
+            [profile.action_styles[action_code].label for action_code in _ordered_actions()]
+        )
         cbar.set_label(cfg.colorbar_label)
 
     if cfg.show_legend:
         ax.legend(
-            handles=_legend_handles(),
+            handles=_legend_handles(profile),
             title=cfg.label or "Thermal-management action",
             loc="best",
         )

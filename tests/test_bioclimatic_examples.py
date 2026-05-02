@@ -23,6 +23,7 @@ VALIDATED_EXAMPLES = [
     "examples/bovinos_racas.yaml",
     "examples/bovine_bioclimatic_final_azevedo.yaml",
     "examples/itu_field_labels.yaml",
+    "examples/operational_overlay_minimal.yaml",
 ]
 
 

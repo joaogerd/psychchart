@@ -35,6 +35,11 @@ operational_overlays:
 The profile defines the policy. The overlay projects one representative state
 of that policy onto the psychrometric chart.
 
+Internally, the renderer resolves the validated `OperationalProfile` and uses
+the same deterministic decision engine exposed by `psychchart.operations.engine`.
+This keeps YAML validation, policy evaluation, colors, labels, legends and
+rendered regions tied to a single declarative source of truth.
+
 ## Built-in dairy profile
 
 psychChart includes a built-in profile named `dairy_cooling_default`.
@@ -53,6 +58,12 @@ operational_overlays:
 
 Define `operational_profiles` explicitly only when a custom management policy
 is needed.
+
+A minimal runnable example is available at:
+
+```bash
+psychchart examples/operational_overlay_minimal.yaml
+```
 
 ## Profiles
 
@@ -109,6 +120,9 @@ action_styles:
   O5: {label: "Emergência", facecolor: "#d73027"}
 ```
 
+These style definitions are also used by the overlay renderer for categorical
+filled regions, colorbars and legends.
+
 ## Modifiers
 
 Modifiers escalate or de-escalate the base action.
@@ -135,6 +149,17 @@ modifiers:
 
 This makes the policy dynamic: the same T x RH point can receive different
 actions depending on accumulated load and trend.
+
+For static overlays, `trend` is converted to a representative derivative:
+
+| trend | representative `dca_dt` |
+|---|---:|
+| falling | -0.002 |
+| steady | 0.000 |
+| rising | 0.002 |
+
+This allows the same declarative decision engine to be used both for static
+chart overlays and future time-series operational diagnostics.
 
 ## Rendering
 

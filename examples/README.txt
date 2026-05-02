@@ -30,6 +30,11 @@ psychchart examples/bovinos_racas.yaml
 psychchart examples/bovine_bioclimatic_final_azevedo.yaml
 psychchart examples/itu_field_labels.yaml
 
+Operational decision examples
+-----------------------------
+
+psychchart examples/operational_overlay_minimal.yaml
+
 Notes
 -----
 
