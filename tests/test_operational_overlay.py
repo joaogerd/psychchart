@@ -1,6 +1,18 @@
 import textwrap
 
+import matplotlib.pyplot as plt
+import pytest
+from matplotlib.colors import to_rgba
+
 from psychchart import PsychChart, load_chart_config
+from psychchart.operations.engine import action
+from psychchart.operations.enums import OperationalAction
+from psychchart.operations.profile import DEFAULT_DAIRY_COOLING_PROFILE
+from psychchart.plot.operational_zones import (
+    _build_action_colormap,
+    _build_management_field,
+    _trend_to_dca_dt,
+)
 
 
 def _render_config(tmp_path, yaml_content: str):
@@ -14,6 +26,10 @@ def _render_config(tmp_path, yaml_content: str):
     assert ax is not None
     assert len(ax.collections) > 0
     return data, chart, ax
+
+
+def _close_chart(chart):
+    plt.close(chart.fig)
 
 
 def test_operational_overlay_smoke_with_explicit_profile(tmp_path):
@@ -83,11 +99,14 @@ def test_operational_overlay_smoke_with_explicit_profile(tmp_path):
         show_boundaries: true
     """
 
-    data, _, _ = _render_config(tmp_path, yaml_content)
+    data, chart, _ = _render_config(tmp_path, yaml_content)
 
-    assert "operational_profiles" in data
-    assert "operational_overlays" in data
-    assert data["operational_overlays"][0].load_class == "A2"
+    try:
+        assert "operational_profiles" in data
+        assert "operational_overlays" in data
+        assert data["operational_overlays"][0].load_class == "A2"
+    finally:
+        _close_chart(chart)
 
 
 def test_operational_overlay_uses_default_dairy_profile(tmp_path):
@@ -112,8 +131,96 @@ def test_operational_overlay_uses_default_dairy_profile(tmp_path):
         show_boundaries: true
     """
 
-    data, _, _ = _render_config(tmp_path, yaml_content)
+    data, chart, _ = _render_config(tmp_path, yaml_content)
 
-    assert "dairy_cooling_default" in data["operational_profiles"]
-    assert data["operational_overlays"][0].profile == "dairy_cooling_default"
-    assert data["operational_overlays"][0].load_class == "A2"
+    try:
+        assert "dairy_cooling_default" in data["operational_profiles"]
+        assert data["operational_overlays"][0].profile == "dairy_cooling_default"
+        assert data["operational_overlays"][0].load_class == "A2"
+    finally:
+        _close_chart(chart)
+
+
+def test_operational_overlay_colormap_uses_declarative_profile_styles():
+    """Overlay colors must come from the runtime profile, not a legacy classifier."""
+    cmap, _, _ = _build_action_colormap(DEFAULT_DAIRY_COOLING_PROFILE)
+
+    assert cmap.N == len(OperationalAction)
+
+    for action_code in OperationalAction:
+        expected = to_rgba(DEFAULT_DAIRY_COOLING_PROFILE.action_styles[action_code].facecolor)
+        assert cmap(int(action_code)) == pytest.approx(expected)
+
+
+def test_operational_overlay_trend_maps_to_profile_modifier_derivative():
+    """Static overlay trends should activate declarative engine modifiers."""
+    profile = DEFAULT_DAIRY_COOLING_PROFILE
+
+    steady = action(
+        profile,
+        T=28.0,
+        RH=0.65,
+        itu=76.0,
+        ca=0.0125,
+        dca_dt=_trend_to_dca_dt("steady"),
+    )
+    rising = action(
+        profile,
+        T=28.0,
+        RH=0.65,
+        itu=76.0,
+        ca=0.0125,
+        dca_dt=_trend_to_dca_dt("rising"),
+    )
+    falling = action(
+        profile,
+        T=28.0,
+        RH=0.65,
+        itu=76.0,
+        ca=0.0025,
+        dca_dt=_trend_to_dca_dt("falling"),
+    )
+
+    assert rising > steady
+    assert falling <= steady
+
+
+def test_operational_overlay_field_uses_configured_load_class_and_trend(tmp_path):
+    """Generated fields should reflect the configured load class and trend."""
+    yaml_content = """
+    profile: default_si
+
+    chart:
+      t_min: 20
+      t_max: 34
+      y_min: 0.0
+      y_max: 0.032
+      pressure: 101325
+      output: operational_overlay_field.png
+
+    operational_overlays:
+      - load_class: A0
+        trend: rising
+        alpha: 0.15
+        n_t: 18
+        n_rh: 16
+        show_boundaries: true
+    """
+
+    data = load_chart_config(tmp_path / "missing.yaml") if False else None
+
+    cfg_path = tmp_path / "operational_overlay_field.yaml"
+    cfg_path.write_text(textwrap.dedent(yaml_content), encoding="utf-8")
+    payload = load_chart_config(cfg_path)
+    chart = PsychChart(**payload)
+    overlay_cfg = payload["operational_overlays"][0]
+
+    T_grid, W_grid, action_grid, profile = _build_management_field(chart, overlay_cfg)
+
+    assert profile.name == "dairy_cooling_default"
+    assert T_grid.shape == (16, 18)
+    assert W_grid.shape == (16, 18)
+    assert action_grid.shape == (16, 18)
+    assert action_grid.compressed().size > 0
+    assert action_grid.max() <= int(OperationalAction.EMERGENCY)
+    assert action_grid.min() >= int(OperationalAction.MONITOR)
