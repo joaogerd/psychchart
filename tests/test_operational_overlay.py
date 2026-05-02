@@ -207,8 +207,6 @@ def test_operational_overlay_field_uses_configured_load_class_and_trend(tmp_path
         show_boundaries: true
     """
 
-    data = load_chart_config(tmp_path / "missing.yaml") if False else None
-
     cfg_path = tmp_path / "operational_overlay_field.yaml"
     cfg_path.write_text(textwrap.dedent(yaml_content), encoding="utf-8")
     payload = load_chart_config(cfg_path)
