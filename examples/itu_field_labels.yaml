@@ -1,0 +1,62 @@
+chart:
+  t_min: 10
+  t_max: 45
+  pressure: 101325
+  y_min: 0.0
+  y_max: 0.035
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg)"
+  title: "ITU semantic field labels"
+  output: "psychchart_itu_field_labels.png"
+  dpi: 200
+
+isolines:
+  relative_humidity:
+    enabled: true
+    values: [0.2, 0.4, 0.6, 0.8, 1.0]
+    color: "#8B1E3F"
+    linestyle: "-"
+    linewidth: 0.7
+    alpha: 0.45
+
+indexes:
+  - index: ITU
+    label: "Temperature-Humidity Index (ITU)"
+
+    # Index semantics: these values define the class intervals and their
+    # user-facing names. They are intentionally kept outside render.field.
+    levels: [50, 63, 75, 79]
+    colors: ["#1a9850", "#fee08b", "#fdae61"]
+    labels: ["Comfort", "Alert", "Stress"]
+
+    render:
+      field:
+        alpha: 0.70
+        colorbar: false
+
+        # Draw the semantic class labels directly inside the index field.
+        labels: true
+        label_fontsize: 22
+        label_color: "#222222"
+        label_alpha: 0.85
+        label_fontweight: bold
+        label_rotation: -15
+
+  - index: ITU
+    render:
+      isolines:
+        levels: [63, 75, 79]
+        style: ":"
+        color: black
+        linewidth: 1.4
+        alpha: 0.75
+        label: true
+        label_fontsize: 8
+        label_fmt: "ITU = {value:.0f}"
+
+points:
+  - label: "Example point"
+    t: 31
+    rh: 0.65
+    marker: "o"
+    color: black
