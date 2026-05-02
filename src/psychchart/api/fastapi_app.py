@@ -11,7 +11,12 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from psychchart.api.workspace import ProjectRecord, WorkspaceStore
-from psychchart.app.services import close_figure, figure_to_bytes, render_figure_from_yaml
+from psychchart.app.services import (
+    close_figure,
+    compute_point_readout,
+    figure_to_bytes,
+    render_figure_from_yaml,
+)
 
 ImageFormat = Literal["png", "svg", "pdf"]
 
@@ -39,6 +44,22 @@ class RenderBase64Response(BaseModel):
     format: ImageFormat
     media_type: str
     data_base64: str
+
+
+class ReadoutRequest(BaseModel):
+    T: float = Field(..., description="Dry-bulb temperature in Celsius.")
+    RH_pct: float = Field(..., ge=0, le=100, description="Relative humidity in percent.")
+    pressure: float = Field(default=101325.0, gt=0, description="Air pressure in Pa.")
+
+
+class ReadoutResponse(BaseModel):
+    T: float
+    RH_pct: float
+    RH: float
+    W: float
+    h: float
+    Tdp: float
+    ITU: float
 
 
 class ProjectCreateRequest(BaseModel):
@@ -81,6 +102,15 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/readout", response_model=ReadoutResponse)
+def readout(req: ReadoutRequest) -> ReadoutResponse:
+    try:
+        result = compute_point_readout(T=req.T, RH_pct=req.RH_pct, pressure=req.pressure)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return ReadoutResponse(**result.as_dict())
 
 
 @app.post("/render", response_model=RenderBase64Response)
