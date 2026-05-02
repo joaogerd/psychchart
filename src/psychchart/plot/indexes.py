@@ -14,6 +14,8 @@ Non-responsibilities:
 """
 
 from __future__ import annotations
+import warnings
+
 import numpy as np
 from matplotlib.pyplot import get_cmap
 from matplotlib.axes import Axes
@@ -148,6 +150,14 @@ def _draw_index_field_labels(ax: Axes, layer, field_cfg, levels, labels, pressur
 
     n_intervals = len(levels) - 1
     if len(labels) != n_intervals:
+        warnings.warn(
+            "Index field labels were requested, but the number of labels "
+            f"({len(labels)}) does not match the number of level intervals "
+            f"({n_intervals}). Expected len(labels) == len(levels) - 1. "
+            "In-chart field labels will be skipped.",
+            UserWarning,
+            stacklevel=2,
+        )
         return
 
     fontsize = field_cfg.label_fontsize or 24.0
