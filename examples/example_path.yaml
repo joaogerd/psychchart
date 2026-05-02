@@ -16,7 +16,7 @@ data_layers:
     projection:
       t_col: temp
       rh_col: rh
-      rh_unit: fraction
+      rh_unit: auto
     temporal:
       time_col: hour
       sort: true
