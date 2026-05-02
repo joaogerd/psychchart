@@ -3,8 +3,66 @@
 </p>
 
 <p align="center">
-    A Python package for generating psychrometric charts using a declarative, YAML-driven configuration.
+  A Python package for generating psychrometric charts using declarative, YAML-driven configuration.
 </p>
+
+---
+
+## What psychChart does
+
+psychChart builds reproducible psychrometric diagrams from configuration files. It separates:
+
+- physical psychrometric calculations;
+- index computation, such as ITU/THI-like fields;
+- semantic profiles, labels and colors;
+- visualization layers;
+- optional operational decision overlays.
+
+This separation keeps scientific calculations auditable while allowing different visual and semantic interpretations to be configured without changing the core code.
+
+---
+
+## Installation for development
+
+From the repository root:
+
+```bash
+python -m pip install -e ".[dev]"
+```
+
+Optional interfaces can be installed with:
+
+```bash
+python -m pip install -e ".[app]"   # Streamlit app
+python -m pip install -e ".[api]"   # FastAPI backend
+```
+
+For Parquet input files:
+
+```bash
+python -m pip install -e ".[parquet]"
+```
+
+---
+
+## Quick validation
+
+Run the test suite:
+
+```bash
+pytest
+```
+
+Render a few validated examples:
+
+```bash
+psychchart examples/itu_field_labels.yaml
+psychchart examples/operational_overlay_minimal.yaml
+psychchart examples/thermal_trajectory_classified.yaml
+psychchart examples/bovine_bioclimatic_final_azevedo.yaml
+```
+
+Examples should be executed from the repository root because example YAML files use repository-relative data paths.
 
 ---
 
@@ -19,40 +77,47 @@ psychchart examples/bovine_bioclimatic_final_azevedo.yaml
 ### Streamlit app
 
 ```bash
-pip install -e .[app]
+python -m pip install -e ".[app]"
 psychchart-app
 ```
 
-### API (production mode)
+### API
 
 ```bash
-pip install -e .[api]
+python -m pip install -e ".[api]"
 uvicorn psychchart.api.fastapi_app:app --reload
 ```
 
 ---
 
-## Architecture
+## Python usage
 
-psychChart is structured as a modular system:
+```python
+from psychchart import PsychChart, load_chart_config
 
-```text
-CORE (physics + rendering)
-    ↑
-SERVICES (application layer)
-    ↑
-INTERFACES:
-  - CLI
-  - Streamlit
-  - FastAPI
+cfg = load_chart_config("examples/itu_field_labels.yaml")
+chart = PsychChart(**cfg)
+chart.draw()
+chart.fig.savefig("chart.png", dpi=200)
 ```
 
-This allows:
+---
 
-- reproducible scientific workflows
-- interactive exploration
-- integration with modern frontends (React/Vite)
-- batch processing pipelines
+## Validated examples
+
+The main validated examples are listed in `examples/README.txt` and covered by smoke tests.
+
+Useful starting points:
+
+```bash
+psychchart examples/example_points.yaml
+psychchart examples/example_mixed.yaml
+psychchart examples/itu_field_labels.yaml
+psychchart examples/operational_overlay_minimal.yaml
+psychchart examples/bovine_bioclimatic_final_azevedo.yaml
+```
+
+Historical material is kept under `examples_old/` and is not part of the validated example set.
 
 ---
 
@@ -79,7 +144,7 @@ indexes:
         label_rotation: -15
 ```
 
-Manual positions may be declared either in chart coordinates (`t`/`w`) or in the more intuitive dry-bulb temperature and relative humidity form (`t`/`rh`). Relative humidity accepts both fractions and percentages.
+Manual positions may be declared either in chart coordinates (`t`/`w`) or in dry-bulb temperature and relative humidity coordinates (`t`/`rh`). Relative humidity accepts both fractions and percentages.
 
 ```yaml
 render:
@@ -97,7 +162,7 @@ render:
         w: 0.020
 ```
 
-A complete example is available at:
+Complete example:
 
 ```bash
 psychchart examples/itu_field_labels.yaml
@@ -105,9 +170,57 @@ psychchart examples/itu_field_labels.yaml
 
 ---
 
+## Operational overlays
+
+Operational overlays turn the chart into a decision-support visualization. They project a declared management policy over the psychrometric domain for a selected accumulated-load class and trend.
+
+```yaml
+operational_overlays:
+  - load_class: A2
+    trend: steady
+    alpha: 0.20
+    show_boundaries: true
+    show_legend: true
+```
+
+When no profile is declared, psychChart injects the built-in `dairy_cooling_default` profile. Custom operational policies can be declared in `operational_profiles`.
+
+Complete example:
+
+```bash
+psychchart examples/operational_overlay_minimal.yaml
+```
+
+Detailed documentation:
+
+```text
+docs/OPERATIONAL_OVERLAYS.md
+```
+
+---
+
+## Architecture
+
+psychChart is structured as a modular system:
+
+```text
+CORE (physics + rendering)
+    ↑
+SERVICES (application layer)
+    ↑
+INTERFACES:
+  - CLI
+  - Streamlit
+  - FastAPI
+```
+
+The internal design follows the same scientific separation used in the documentation: observations, psychrometric transformations, indexes, semantic profiles and rendering remain independent layers.
+
+---
+
 ## API usage
 
-### Render chart (JSON)
+### Render chart as JSON
 
 ```http
 POST /render
@@ -123,33 +236,23 @@ Response:
 }
 ```
 
-### Render chart (file)
+### Render chart as file
 
 ```http
 POST /render/file
 ```
 
-Returns binary image.
-
----
-
-## Python usage
-
-```python
-from psychchart import load_chart_config, PsychChart
-
-cfg = load_chart_config("chart.yaml")
-chart = PsychChart(**cfg)
-chart.draw()
-```
+Returns binary image output.
 
 ---
 
 ## Documentation
 
-- docs/api_usage.md
-- docs/BOVINE_BIOCLIMATIC_CHART.md
-- docs/OPERATIONAL_OVERLAYS.md
+- `docs/api_usage.md`
+- `docs/BOVINE_BIOCLIMATIC_CHART.md`
+- `docs/OPERATIONAL_OVERLAYS.md`
+- `examples/README.txt`
+- `CHANGELOG.md`
 
 ---
 
