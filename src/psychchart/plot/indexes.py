@@ -213,6 +213,73 @@ def _draw_index_field_labels(ax: Axes, layer, field_cfg, levels, labels, pressur
         )
 
 
+def _auto_index_zone_label_position(
+    ax: Axes,
+    layer,
+    mask: np.ndarray,
+) -> tuple[float | None, float | None]:
+    """Estimate a representative in-domain label point for an index-zone mask."""
+    x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
+
+    visible_mask = (
+        mask
+        & np.isfinite(layer.X)
+        & np.isfinite(layer.Y)
+        & (layer.X >= x_min)
+        & (layer.X <= x_max)
+        & (layer.Y >= y_min)
+        & (layer.Y <= y_max)
+    )
+
+    if not np.any(visible_mask):
+        return None, None
+
+    return (
+        float(np.nanmedian(layer.X[visible_mask])),
+        float(np.nanmedian(layer.Y[visible_mask])),
+    )
+
+
+def _manual_index_zone_label_position(chart, zone) -> tuple[float | None, float | None]:
+    """Resolve a manual index-zone label position from T/RH coordinates."""
+    if zone.label_t is None or zone.label_rh is None:
+        return None, None
+    return (
+        float(zone.label_t),
+        float(Psychrometrics.humidity_ratio(zone.label_t, zone.label_rh, chart.cfg.pressure)),
+    )
+
+
+def _draw_index_zone_label(chart, ax: Axes, layer, zone, mask: np.ndarray) -> None:
+    """Draw an optional label inside an index-derived zone."""
+    if not getattr(zone, "show_label", False):
+        return
+
+    if zone.label_position == "manual":
+        x, y = _manual_index_zone_label_position(chart, zone)
+    else:
+        x, y = _auto_index_zone_label_position(ax, layer, mask)
+
+    if x is None or y is None:
+        return
+
+    color = zone.label_color or zone.edgecolor or zone.color
+    ax.text(
+        x,
+        y,
+        zone.label or zone.name,
+        fontsize=zone.label_fontsize,
+        color=color,
+        fontweight=zone.label_fontweight or "normal",
+        rotation=zone.label_rotation,
+        bbox=zone.label_bbox,
+        ha="center",
+        va="center",
+        zorder=ZORDER["zone_edge"] + 0.1,
+    )
+
+
 # =============================================================================
 # Continuous index fields (heatmaps)
 # =============================================================================
@@ -355,32 +422,48 @@ def _draw_index_zone(chart, ax: Axes, zone):
     if not hasattr(zone, "range") or len(zone.range) != 2:
         raise ValueError(f"Invalid zone range for index '{zone.index}'")
 
-    mask = (layer.Z >= zone.range[0]) & (layer.Z <= zone.range[1])
+    lower, upper = zone.range
+    mask = (layer.Z >= lower) & (layer.Z <= upper)
+    facecolor = zone.facecolor or zone.color
 
     ax.contourf(
         layer.X,
         layer.Y,
         mask,
         levels=[0.5, 1],
-        colors=[zone.color],
+        colors=[facecolor],
         alpha=zone.alpha,
         zorder=ZORDER["index_zone"],
     )
 
-    if not hasattr(chart, "_index_zone_counter"):
-        chart._index_zone_counter = 0
+    if zone.edgecolor and zone.linewidth > 0:
+        ax.contour(
+            layer.X,
+            layer.Y,
+            mask,
+            levels=[0.5],
+            colors=[zone.edgecolor],
+            linewidths=zone.linewidth,
+            zorder=ZORDER["zone_edge"],
+        )
 
-    ax.text(
-        0.01,
-        0.99 - 0.05 * chart._index_zone_counter,
-        f"{zone.index}: {zone.name}",
-        transform=ax.transAxes,
-        fontsize=9,
-        verticalalignment="top",
-        zorder=ZORDER["zone_edge"],
-    )
+    _draw_index_zone_label(chart, ax, layer, zone, mask)
 
-    chart._index_zone_counter += 1
+    if not zone.show_label:
+        if not hasattr(chart, "_index_zone_counter"):
+            chart._index_zone_counter = 0
+
+        ax.text(
+            0.01,
+            0.99 - 0.05 * chart._index_zone_counter,
+            f"{zone.index}: {zone.name}",
+            transform=ax.transAxes,
+            fontsize=9,
+            verticalalignment="top",
+            zorder=ZORDER["zone_edge"],
+        )
+
+        chart._index_zone_counter += 1
 
 
 def _draw_operational_overlays(chart, ax: Axes) -> None:
