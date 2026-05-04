@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from matplotlib.axes import Axes
 
 from .core import PsychChart as _BasePsychChart
@@ -12,9 +14,14 @@ class PsychChart(_BasePsychChart):
     """Psychrometric chart renderer with app-level post-draw layers.
 
     The core renderer owns the established rendering pipeline. Explicit
-    intervention zones are drawn immediately after that pipeline completes so
-    they can use the finalized T-W axis domain.
+    intervention zones are accepted by the public wrapper and drawn immediately
+    after the core pipeline completes so they can use the finalized T-W axis
+    domain.
     """
+
+    def __init__(self, *args: Any, intervention_zones=None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.intervention_zones = intervention_zones
 
     def draw(self) -> Axes:
         ax = super().draw()
