@@ -1,0 +1,56 @@
+chart:
+  t_min: 10
+  t_max: 45
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg)"
+  title: "Labeled ITU index zone"
+  output: "index_zone_itu_labeled.png"
+  dpi: 180
+
+isolines:
+  relative_humidity:
+    enabled: true
+    values: [0.2, 0.4, 0.6, 0.8, 1.0]
+    color: "#666666"
+    linestyle: "-"
+    linewidth: 0.6
+    alpha: 0.45
+
+indexes:
+  - index: ITU
+    render:
+      isolines:
+        levels: [68, 72, 76, 80]
+        color: black
+        linewidth: 1.1
+        style: ":"
+        alpha: 0.80
+        label: true
+        label_fontsize: 8
+        label_fmt: "ITU {value:.0f}"
+
+index_zones:
+  - index: ITU
+    name: "ITU comfort band"
+    range: [68, 72]
+    facecolor: "#A8E67A"
+    edgecolor: "#5B8F3A"
+    linewidth: 1.0
+    alpha: 0.35
+    show_label: true
+    label: "ITU comfort"
+    label_position: auto
+    label_color: "#2F3A2F"
+    label_fontsize: 11
+    label_fontweight: bold
+    label_rotation: 65
+
+points:
+  - label: "Example point"
+    t: 28
+    rh: 0.65
+    marker: "o"
+    color: black
