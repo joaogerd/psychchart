@@ -2,18 +2,8 @@
 Root configuration model for psychchart.
 
 This module defines the top-level validated application configuration used by
-the ``psychchart`` package.
-
-It provides the canonical entry point for configuration validation after the
-base profile and user YAML documents have been loaded and deep-merged. The
-root model centralizes the structure of the full configuration document and
-connects all major configuration sections, including chart settings, isolines,
-zones, points, indexes, legacy observations, legacy temporal overlays, and the
-canonical unified ``data_layers`` section.
-
-The main goal of this module is to ensure that the rest of the codebase can
-operate on a stable, strongly typed, and semantically normalized configuration
-object instead of raw nested dictionaries.
+``psychchart`` after base profiles and user YAML documents have been loaded and
+merged.
 """
 
 from __future__ import annotations
@@ -26,6 +16,7 @@ from .base import StrictModel
 from .chart import ChartConfig
 from .data_layers import DataLayerConfig
 from .indexes import IndexConfig
+from .intervention_zones import InterventionZonesConfig
 from .observations import ObservationsConfig
 from .overlays import TemporalOverlayConfig
 from .points import Point
@@ -43,9 +34,7 @@ from .operations import (
 # Legacy compatibility helpers
 # =============================================================================
 def _observation_to_data_layer(obs: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Convert one legacy ``observations`` entry into a canonical data layer.
-    """
+    """Convert one legacy ``observations`` entry into a canonical data layer."""
     fields: List[Dict[str, Any]] = []
     render: List[Dict[str, Any]] = []
 
@@ -129,9 +118,7 @@ def _observation_to_data_layer(obs: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _temporal_to_data_layer(overlay: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Convert one legacy ``temporal_overlays`` entry into a canonical data layer.
-    """
+    """Convert one legacy ``temporal_overlays`` entry into a canonical data layer."""
     render: List[Dict[str, Any]] = []
 
     if overlay.get("show_path", True):
@@ -205,15 +192,7 @@ def _temporal_to_data_layer(overlay: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _inject_default_operational_profile(data: Dict[str, Any]) -> None:
-    """
-    Inject the built-in dairy operational profile when it is referenced.
-
-    The operational layer is designed to be declarative, but most examples and
-    routine use cases should not need to repeat the full default dairy cooling
-    policy. When an overlay references ``dairy_cooling_default`` and the profile
-    is not explicitly provided, this helper inserts a validated default mapping
-    before Pydantic model validation.
-    """
+    """Inject the built-in dairy operational profile when it is referenced."""
     overlays = data.get("operational_overlays") or []
     if not overlays:
         return
@@ -240,14 +219,7 @@ def _inject_default_operational_profile(data: Dict[str, Any]) -> None:
 
 
 class AppConfig(StrictModel):
-    """
-    Root validated application configuration for ``psychchart``.
-
-    The canonical runtime-facing dataset layer is ``data_layers``. Legacy
-    ``observations`` and ``temporal_overlays`` are still accepted as input and
-    normalized into canonical data-layer definitions when ``data_layers`` is not
-    explicitly provided.
-    """
+    """Root validated application configuration for ``psychchart``."""
 
     chart: ChartConfig
     isolines: Dict[str, IsoSet] = Field(default_factory=dict)
@@ -263,13 +235,12 @@ class AppConfig(StrictModel):
 
     operational_profiles: dict[str, OperationalProfileConfig] = Field(default_factory=dict)
     operational_overlays: list[OperationalOverlayConfig] = Field(default_factory=list)
+    intervention_zones: InterventionZonesConfig | None = None
 
     @model_validator(mode="before")
     @classmethod
     def normalize_legacy_shapes(cls, data: Any) -> Any:
-        """
-        Normalize supported legacy configuration shapes before validation.
-        """
+        """Normalize supported legacy configuration shapes before validation."""
         if not isinstance(data, dict):
             raise TypeError("Top-level configuration must be a mapping/dict")
 
@@ -390,9 +361,7 @@ class AppConfig(StrictModel):
         return data
 
     def to_runtime_payload(self) -> Dict[str, Any]:
-        """
-        Convert the validated model into the canonical runtime payload.
-        """
+        """Convert the validated model into the canonical runtime payload."""
         return {
             "cfg": self.chart,
             "isolines": {
@@ -406,13 +375,12 @@ class AppConfig(StrictModel):
             "data_layers": self.data_layers,
             "operational_profiles": self.operational_profiles,
             "operational_overlays": self.operational_overlays,
+            "intervention_zones": self.intervention_zones,
         }
 
     @model_validator(mode="after")
     def validate_operational_sections(self):
-        """
-        Validate references between operational overlays and profiles.
-        """
+        """Validate references between operational overlays and profiles."""
         if not self.operational_overlays:
             return self
 
