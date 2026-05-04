@@ -1,0 +1,84 @@
+chart:
+  t_min: 10
+  t_max: 45
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg)"
+  title: "Explicit intervention zones"
+  output: "intervention_zones_minimal.png"
+  dpi: 180
+
+isolines:
+  relative_humidity:
+    enabled: true
+    values: [0.2, 0.4, 0.6, 0.8, 1.0]
+    color: "#666666"
+    linestyle: "-"
+    linewidth: 0.6
+    alpha: 0.45
+
+intervention_zones:
+  enabled: true
+  n_t: 120
+  n_w: 90
+  show_labels: true
+  show_vectors: true
+  show_boundaries: true
+
+  rules:
+    - name: ventilation
+      label: "Ventilation"
+      when:
+        t_gte: 28
+        w_lt: 0.020
+      vector: [-3.0, 0.0]
+      facecolor: "#A8E67A"
+      edgecolor: "#5B8F3A"
+      alpha: 0.25
+      linewidth: 1.0
+      label_style:
+        fontsize: 9
+        color: "#1f2937"
+        fontweight: bold
+
+    - name: dehumidification
+      label: "Reduce humidity"
+      when:
+        w_gte: 0.020
+        t_lt: 32
+      vector: [0.0, -0.004]
+      facecolor: "#93c5fd"
+      edgecolor: "#1d4ed8"
+      alpha: 0.22
+      linewidth: 1.0
+      label_style:
+        fontsize: 9
+        color: "#1e3a8a"
+        fontweight: bold
+
+  inappropriate_rules:
+    - name: avoid_evaporative_hot_humid
+      label: "Avoid evaporative"
+      reason: "hot and humid"
+      when:
+        t_gte: 32
+        w_gte: 0.020
+      facecolor: "#fdae61"
+      edgecolor: "#7f0000"
+      alpha: 0.18
+      linewidth: 1.0
+      hatch: "///"
+      label_style:
+        fontsize: 9
+        color: "#7f0000"
+        fontweight: bold
+
+points:
+  - label: "Hot-humid example"
+    t: 34
+    rh: 0.75
+    marker: "o"
+    color: black
+    show_label: true
