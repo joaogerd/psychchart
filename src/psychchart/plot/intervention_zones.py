@@ -198,15 +198,20 @@ def draw_rule_region(
         config.inappropriate_zorder if is_bad else config.zorder
     )
 
+    contour_kwargs = {
+        "levels": [0.5, 1.5],
+        "colors": [rule.facecolor],
+        "alpha": rule.alpha * config.alpha_scale,
+        "zorder": zorder,
+    }
+    if rule.hatch:
+        contour_kwargs["hatches"] = [rule.hatch]
+
     contour = ax.contourf(
         T_grid,
         W_grid,
         field,
-        levels=[0.5, 1.5],
-        colors=[rule.facecolor],
-        alpha=rule.alpha * config.alpha_scale,
-        hatches=[rule.hatch] if rule.hatch else None,
-        zorder=zorder,
+        **contour_kwargs,
     )
     artists.append(contour)
 
