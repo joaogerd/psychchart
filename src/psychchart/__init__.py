@@ -67,7 +67,7 @@ or
 # NOTE:
 # The version string is intentionally defined here to make it accessible
 # programmatically (e.g., psychchart.__version__) and by packaging tools.
-__version__ = '1.0.0'
+__version__ = "1.1.0"
 
 
 # =============================================================================
@@ -76,7 +76,7 @@ __version__ = '1.0.0'
 
 # Configuration-related classes
 # These define the declarative structure of the chart (axes, isopleths, zones).
-from .config import ChartConfig, IsoSet, Zone, Point,  IndexConfig, IndexZone, ObservationsConfig
+from .config import ChartConfig, IsoSet, Zone, Point, IndexConfig, IndexZone, ObservationsConfig
 
 # Main plotting interface
 # This is the high-level object responsible for rendering the psychrometric chart.
@@ -139,6 +139,6 @@ __all__ = [
 #
 # >>> import psychchart
 # >>> psychchart.__version__
-# '0.1.0'
+# '1.1.0'
 #
 
