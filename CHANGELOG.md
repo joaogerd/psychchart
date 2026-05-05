@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.1.0] - 2026-05-04
+
+### Added
+- FastAPI `/readout` endpoint for point-based psychrometric diagnostics, returning temperature, RH, humidity ratio, enthalpy, dew point and ITU values.
+- Interactive frontend workspace base layout derived from the validated `marsh-ui` work.
+- Frontend API helpers for rendering, binary export and readout calls.
+- Frontend package lockfile for reproducible `npm ci` builds.
+- Labeled `index_zones` with configurable internal labels, manual/automatic placement and style options.
+- Standalone `intervention_zones` configuration and rendering layer for explicit physical intervention regions in T-W space.
+- YAML/rendering pipeline integration for `intervention_zones`.
+- Minimal intervention-zone example: `examples/intervention_zones_minimal.yaml`.
+- Minimal labeled ITU index-zone example: `examples/index_zone_itu_labeled.yaml`.
+- Branching and release workflow documentation.
+- Release-closing roadmap for version `1.1.0`.
+
+### Changed
+- Public plotting interface now accepts app-level `intervention_zones` and draws them after the core chart domain is finalized.
+- `intervention_zones` support recommended and inappropriate actions, labels, boundaries, hatches, vectors and saturation clipping.
+- Branch management policy now favors short-lived feature/fix/docs branches, an integration branch and release-only updates to `main`.
+
+### Fixed
+- Package version metadata is aligned for the `1.1.0` release.
+- Public `psychchart.__version__` is aligned with package metadata.
+- Intervention-zone contour fills no longer pass null hatch lists to Matplotlib, avoiding savefig failures in backends that expect iterable hatches.
+- Obsolete long-lived development branches were cleaned from the remote repository after their useful changes were extracted.
+
 ## [1.0.1] - 2026-05-01
 
 ### Added
@@ -84,7 +110,7 @@
 ## [0.2.0] - 2026-01-11
 ### Added
 - Modular plotting backend (`plot/` package)
-- Support for index fields (e.g. ITU, ITI) over psychrometric domain
+- Support for index fields (e.g., ITU, ITI) over psychrometric domain
 - Smoke tests for index field computation and rendering
 - New illustrative examples (cartesian ITU, cattle breeds)
 
