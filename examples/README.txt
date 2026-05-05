@@ -3,6 +3,10 @@ psychChart examples
 
 Run examples from the repository root so relative data paths resolve correctly.
 
+The examples listed here are part of the validated release smoke-test set.
+Files under examples_old/ are historical references and are not part of the
+validated set.
+
 Core examples
 -------------
 
@@ -20,20 +24,26 @@ Path and trajectory examples
 
 psychchart examples/path_basic.yaml
 psychchart examples/path_colored_cta.yaml
+psychchart examples/path_colored_itu.yaml
+psychchart examples/path_dashed_order_by.yaml
+psychchart examples/path_order_by.yaml
+psychchart examples/path_points.yaml
 psychchart examples/path_scatter_annotate_cta.yaml
 psychchart examples/thermal_trajectory_classified.yaml
 
-Bioclimatic examples
---------------------
+Bioclimatic and index examples
+------------------------------
 
 psychchart examples/bovinos_racas.yaml
 psychchart examples/bovine_bioclimatic_final_azevedo.yaml
 psychchart examples/itu_field_labels.yaml
+psychchart examples/index_zone_itu_labeled.yaml
 
-Operational decision examples
------------------------------
+Operational decision and intervention examples
+----------------------------------------------
 
 psychchart examples/operational_overlay_minimal.yaml
+psychchart examples/intervention_zones_minimal.yaml
 
 Notes
 -----
