@@ -10,6 +10,38 @@ from matplotlib.axes import Axes
 from psychchart.data.layer_runtime import ProcessedDataLayer
 
 
+def _resolve_order_by(layer: ProcessedDataLayer, cfg) -> str | None:
+    if getattr(cfg, "order_by", None) is not None:
+        return cfg.order_by
+
+    temporal = getattr(layer.config, "temporal", None)
+    if temporal is not None:
+        return getattr(temporal, "time_col", None)
+
+    return None
+
+
+def _sample_frame(df, every: int | None):
+    if every is None or every <= 1:
+        return df.reset_index(drop=True)
+    return df.iloc[::every].reset_index(drop=True)
+
+
+def _colorbar_kwargs(cfg) -> dict:
+    kwargs = {"label": cfg.colorbar_label or cfg.value}
+
+    if cfg.colorbar_shrink is not None:
+        kwargs["shrink"] = cfg.colorbar_shrink
+    if cfg.colorbar_pad is not None:
+        kwargs["pad"] = cfg.colorbar_pad
+    if cfg.colorbar_aspect is not None:
+        kwargs["aspect"] = cfg.colorbar_aspect
+    if cfg.colorbar_ticks is not None:
+        kwargs["ticks"] = cfg.colorbar_ticks
+
+    return kwargs
+
+
 def draw_scatter(
     ax: Axes,
     layer: ProcessedDataLayer,
@@ -27,10 +59,13 @@ def draw_scatter(
     cfg : ScatterRenderConfig
         Rendering configuration.
     """
+    df = layer.ordered_frame(_resolve_order_by(layer, cfg))
+    df = _sample_frame(df, getattr(cfg, "every", 1))
+
     if cfg.value is None:
         ax.scatter(
-            layer.T,
-            layer.W,
+            df["_T"].to_numpy(),
+            df["_W"].to_numpy(),
             color=cfg.color or "black",
             s=cfg.size,
             alpha=cfg.alpha,
@@ -40,12 +75,17 @@ def draw_scatter(
         )
         return
 
-    values = layer.get_array(cfg.value)
+    if cfg.value not in df.columns:
+        available = ", ".join(map(str, df.columns))
+        raise KeyError(
+            f"Scatter renderer requested value={cfg.value!r}, but this column "
+            f"is not present in the processed dataframe. Available columns: {available}"
+        )
 
     artist = ax.scatter(
-        layer.T,
-        layer.W,
-        c=values,
+        df["_T"].to_numpy(),
+        df["_W"].to_numpy(),
+        c=df[cfg.value].to_numpy(),
         cmap=cfg.cmap,
         s=cfg.size,
         alpha=cfg.alpha,
@@ -55,4 +95,4 @@ def draw_scatter(
     )
 
     if cfg.colorbar:
-        plt.colorbar(artist, ax=ax, label=cfg.value)
+        plt.colorbar(artist, ax=ax, **_colorbar_kwargs(cfg))
