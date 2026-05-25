@@ -6,22 +6,30 @@ from __future__ import annotations
 
 import numbers
 
+import pandas as pd
 from matplotlib.axes import Axes
 
 from psychchart.data.layer_runtime import ProcessedDataLayer
 
 
-def _format_alias_value(value):
-    """Return cleaner scalar aliases for template formatting.
-
-    Pandas row iteration may convert integer-like values to floats when a row
-    mixes integer and float columns. For human-readable temporal labels, values
-    like 0.0 and 1.0 are normalized back to 0 and 1.
-    """
+def _format_integer_like(value):
+    """Return cleaner scalar aliases for template formatting."""
     if isinstance(value, numbers.Real) and not isinstance(value, bool):
         if float(value).is_integer():
             return int(value)
     return value
+
+
+def _format_time_value(value, time_format: str | None):
+    """Format a time-field value for annotation templates."""
+    if time_format is None:
+        return _format_integer_like(value)
+
+    timestamp = pd.to_datetime(value)
+    if pd.isna(timestamp):
+        return ""
+
+    return timestamp.strftime(time_format)
 
 
 def _get_row_value(row, field_name: str):
@@ -45,9 +53,13 @@ def _build_annotation_context(row, cfg) -> dict:
     overlay templates such as ``{time}h\n(CTA:{cta:.0f})``.
     """
     context = {str(key): value for key, value in row.items()}
+    time_format = getattr(cfg, "time_format", None)
 
     if cfg.time_field:
-        context["time"] = _format_alias_value(_get_row_value(row, cfg.time_field))
+        context["time"] = _format_time_value(
+            _get_row_value(row, cfg.time_field),
+            time_format,
+        )
     else:
         context.setdefault("time", "")
 
