@@ -1,0 +1,49 @@
+chart:
+  t_min: 15
+  t_max: 42
+  y_min: 0.0
+  y_max: 0.035
+  pressure: 101325
+  xlabel: "Dry-bulb temperature (°C)"
+  ylabel: "Humidity ratio (kg/kg)"
+  title: "Temporal CTA trajectory as a canonical data layer"
+  output: "cta_temporal_data_layer.png"
+  dpi: 180
+
+data_layers:
+  - data: "examples/data/animal_day.csv"
+    format: "csv"
+    projection:
+      t_col: "temperature"
+      rh_col: "relative_humidity"
+      rh_unit: auto
+    temporal:
+      time_col: "hour"
+      sort: true
+    fields:
+      - type: direct_column
+        name: CTA
+        col: cta_accumulated
+    render:
+      - type: path
+        order_by: hour
+        color: blue
+        linewidth: 1.5
+        alpha: 0.7
+        label: "CTA trajectory"
+      - type: scatter
+        value: CTA
+        cmap: viridis
+        size: 48
+        alpha: 1.0
+        edgecolor: black
+        edgewidth: 0.6
+        colorbar: true
+      - type: annotate
+        every: 3
+        template: "{time}h\nCTA={value:.0f}"
+        time_field: hour
+        value_field: CTA
+        dx: 0.35
+        dy: 0.0005
+        fontsize: 8

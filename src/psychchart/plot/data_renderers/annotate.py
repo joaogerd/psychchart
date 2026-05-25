@@ -4,60 +4,60 @@ Renderer for periodic annotations over processed data layers.
 
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Any
+import numbers
 
-import pandas as pd
 from matplotlib.axes import Axes
 
 from psychchart.data.layer_runtime import ProcessedDataLayer
 
 
-def _coerce_datetime(value: Any) -> Any:
-    """Return a datetime-like value when a scalar can be safely parsed."""
-    if isinstance(value, (datetime, date, pd.Timestamp)):
-        return value
+def _format_alias_value(value):
+    """Return cleaner scalar aliases for template formatting.
 
-    if isinstance(value, str):
-        try:
-            parsed = pd.to_datetime(value, errors="raise")
-        except (TypeError, ValueError):
-            return value
-
-        if pd.isna(parsed):
-            return value
-        return parsed
-
+    Pandas row iteration may convert integer-like values to floats when a row
+    mixes integer and float columns. For human-readable temporal labels, values
+    like 0.0 and 1.0 are normalized back to 0 and 1.
+    """
+    if isinstance(value, numbers.Real) and not isinstance(value, bool):
+        if float(value).is_integer():
+            return int(value)
     return value
 
 
-def _build_annotation_context(row, cfg) -> dict[str, Any]:
-    """Build the formatting context used by annotation templates.
+def _get_row_value(row, field_name: str):
+    """Return a row value with a clear error when the field is missing."""
+    if field_name not in row.index:
+        available = ", ".join(map(str, row.index))
+        raise KeyError(
+            f"Annotation renderer requested field {field_name!r}, "
+            f"but it is not present in the processed dataframe. "
+            f"Available columns: {available}"
+        )
+    return row[field_name]
 
-    The public template keys remain backward compatible:
 
-    - ``time`` comes from ``cfg.time_field``
-    - ``value`` comes from ``cfg.value_field``
+def _build_annotation_context(row, cfg) -> dict:
+    """Build the formatting context used by the annotation template.
 
-    In addition, all dataframe columns are exposed by their column names. This
-    allows labels such as ``{hora:02.0f}``, ``{cta:.0f}``, or
-    ``{data_hora:%H:%M}`` when those columns exist in the processed layer.
+    The context exposes every dataframe column by its original name and adds the
+    stable aliases ``time`` and ``value``. When ``value_field`` is configured,
+    the alias ``cta`` is also populated for compatibility with old temporal
+    overlay templates such as ``{time}h\n(CTA:{cta:.0f})``.
     """
-    context: dict[str, Any] = {}
+    context = {str(key): value for key, value in row.items()}
 
-    for key, value in row.items():
-        context[str(key)] = _coerce_datetime(value)
+    if cfg.time_field:
+        context["time"] = _format_alias_value(_get_row_value(row, cfg.time_field))
+    else:
+        context.setdefault("time", "")
 
-    context["time"] = (
-        context.get(cfg.time_field, "")
-        if cfg.time_field
-        else ""
-    )
-    context["value"] = (
-        context.get(cfg.value_field, "")
-        if cfg.value_field
-        else ""
-    )
+    if cfg.value_field:
+        value = _get_row_value(row, cfg.value_field)
+        context["value"] = value
+        context["cta"] = value
+    else:
+        context.setdefault("value", "")
+        context.setdefault("cta", "")
 
     return context
 
@@ -93,7 +93,16 @@ def draw_annotate(
             continue
 
         context = _build_annotation_context(row, cfg)
-        label = cfg.template.format(**context)
+
+        try:
+            label = cfg.template.format(**context)
+        except KeyError as exc:
+            missing = exc.args[0]
+            available = ", ".join(sorted(context))
+            raise KeyError(
+                f"Annotation template references unknown field {missing!r}. "
+                f"Available template fields: {available}"
+            ) from exc
 
         ax.text(
             row["_T"] + cfg.dx,

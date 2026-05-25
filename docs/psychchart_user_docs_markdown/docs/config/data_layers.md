@@ -244,3 +244,65 @@ fields:
 ### Erros comuns
 
 - Usar `value` em um render apontando para um nome que não existe nem em coluna nem em `fields`.
+---
+
+## Substituição de `temporal_overlays` por `data_layers`
+
+`temporal_overlays` é mantido apenas como formato legado de entrada. A forma
+canônica para trajetórias temporais é `data_layers`, combinando:
+
+- `projection` para mapear temperatura e umidade relativa;
+- `temporal` para declarar a coluna de tempo e ordenação;
+- `fields` para expor uma métrica acumulada, como CTA;
+- `render` para desenhar caminho, pontos coloridos e anotações.
+
+Exemplo canônico:
+
+```yaml
+data_layers:
+  - data: "animal_day.csv"
+    format: "csv"
+    projection:
+      t_col: "temperature"
+      rh_col: "relative_humidity"
+      rh_unit: auto
+    temporal:
+      time_col: "hour"
+      sort: true
+    fields:
+      - type: direct_column
+        name: CTA
+        col: cta_accumulated
+    render:
+      - type: path
+        order_by: hour
+        color: blue
+        linewidth: 1.5
+        label: "CTA trajectory"
+      - type: scatter
+        value: CTA
+        cmap: viridis
+        colorbar: true
+      - type: annotate
+        every: 3
+        template: "{time}h\nCTA={value:.0f}"
+        time_field: hour
+        value_field: CTA
+```
+
+Equivalência legada:
+
+```yaml
+temporal_overlays:
+  - type: CTA
+    data: "animal_day.csv"
+    t_col: "temperature"
+    rh_col: "relative_humidity"
+    time_col: "hour"
+    cta_col: "cta_accumulated"
+```
+
+Quando `data_layers` não é informado, essa forma legada é convertida
+internamente para a estrutura canônica. Quando `data_layers` é informado, ele
+tem precedência e `temporal_overlays` não é usado para sintetizar camadas.
+
