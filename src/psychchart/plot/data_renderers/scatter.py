@@ -30,16 +30,34 @@ def _sample_frame(df, every: int | None):
 def _colorbar_kwargs(cfg) -> dict:
     kwargs = {"label": cfg.colorbar_label or cfg.value}
 
+    if cfg.colorbar_location is not None:
+        kwargs["location"] = cfg.colorbar_location
     if cfg.colorbar_shrink is not None:
         kwargs["shrink"] = cfg.colorbar_shrink
     if cfg.colorbar_pad is not None:
         kwargs["pad"] = cfg.colorbar_pad
     if cfg.colorbar_aspect is not None:
         kwargs["aspect"] = cfg.colorbar_aspect
+    if cfg.colorbar_fraction is not None:
+        kwargs["fraction"] = cfg.colorbar_fraction
     if cfg.colorbar_ticks is not None:
         kwargs["ticks"] = cfg.colorbar_ticks
 
     return kwargs
+
+
+def _style_colorbar(colorbar, cfg) -> None:
+    if cfg.colorbar_labelpad is not None:
+        colorbar.set_label(
+            cfg.colorbar_label or cfg.value,
+            labelpad=cfg.colorbar_labelpad,
+            rotation=cfg.colorbar_label_rotation,
+        )
+    elif cfg.colorbar_label_rotation is not None:
+        colorbar.set_label(
+            cfg.colorbar_label or cfg.value,
+            rotation=cfg.colorbar_label_rotation,
+        )
 
 
 def draw_scatter(
@@ -95,4 +113,5 @@ def draw_scatter(
     )
 
     if cfg.colorbar:
-        plt.colorbar(artist, ax=ax, **_colorbar_kwargs(cfg))
+        colorbar = plt.colorbar(artist, ax=ax, **_colorbar_kwargs(cfg))
+        _style_colorbar(colorbar, cfg)
