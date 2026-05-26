@@ -118,7 +118,13 @@ def _observation_to_data_layer(obs: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _temporal_to_data_layer(overlay: Dict[str, Any]) -> Dict[str, Any]:
-    """Convert one legacy ``temporal_overlays`` entry into a canonical data layer."""
+    """Convert one legacy ``temporal_overlays`` entry into a canonical data layer.
+
+    ``temporal_overlays`` is now treated only as a backward-compatible input
+    shape. The validated runtime receives a regular ``data_layers`` entry with
+    projection, temporal ordering, one scalar field and explicit render blocks.
+    """
+    field_name = str(overlay.get("type") or "CTA")
     render: List[Dict[str, Any]] = []
 
     if overlay.get("show_path", True):
@@ -129,6 +135,7 @@ def _temporal_to_data_layer(overlay: Dict[str, Any]) -> Dict[str, Any]:
                 "color": overlay.get("path_color", "blue"),
                 "alpha": overlay.get("path_alpha", 0.6),
                 "linewidth": overlay.get("path_linewidth", 1.2),
+                "label": field_name if overlay.get("show_legend", True) else None,
                 "zorder": overlay.get("path_zorder", 20),
             }
         )
@@ -136,7 +143,7 @@ def _temporal_to_data_layer(overlay: Dict[str, Any]) -> Dict[str, Any]:
     render.append(
         {
             "type": "scatter",
-            "value": "CTA",
+            "value": field_name,
             "cmap": "viridis",
             "size": overlay.get("point_size", 42.0),
             "alpha": 1.0,
@@ -158,7 +165,7 @@ def _temporal_to_data_layer(overlay: Dict[str, Any]) -> Dict[str, Any]:
                     "{time}h\n(CTA:{value:.0f})",
                 ),
                 "time_field": overlay["time_col"],
-                "value_field": "CTA",
+                "value_field": field_name,
                 "dx": overlay.get("annotation_dx", 0.35),
                 "dy": overlay.get("annotation_dy", 0.0005),
                 "fontsize": overlay.get("annotation_fontsize", 8.0),
@@ -183,7 +190,7 @@ def _temporal_to_data_layer(overlay: Dict[str, Any]) -> Dict[str, Any]:
         "fields": [
             {
                 "type": "direct_column",
-                "name": "CTA",
+                "name": field_name,
                 "col": overlay["cta_col"],
             }
         ],

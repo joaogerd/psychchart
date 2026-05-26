@@ -154,6 +154,52 @@ def _build_observations_config(
     )
 
 
+def _require_columns(df: pd.DataFrame, names: Iterable[str], context: str) -> None:
+    """Validate that all named columns are present in a dataframe."""
+    missing = [name for name in names if name not in df.columns]
+    if not missing:
+        return
+
+    available = ", ".join(map(str, df.columns))
+    raise KeyError(
+        f"{context} references missing column(s): {missing}. "
+        f"Available columns: {available}"
+    )
+
+
+def _validate_render_references(cfg: DataLayerConfig, df: pd.DataFrame) -> None:
+    """Validate renderer column references after fields have been materialized.
+
+    Renderers should fail before plotting when they reference a missing field or
+    source column. This keeps errors close to the data-layer build step and
+    avoids partially rendered figures with late Matplotlib failures.
+    """
+    for render_cfg in cfg.render:
+        render_type = render_cfg.type
+        context = f"Data layer '{cfg.data}' render '{render_type}'"
+
+        if render_type == "scatter" and render_cfg.value is not None:
+            _require_columns(df, [render_cfg.value], context)
+
+        elif render_type == "scalar_field":
+            _require_columns(df, [render_cfg.value], context)
+
+        elif render_type == "classified_points":
+            _require_columns(df, [render_cfg.value_col], context)
+
+        elif render_type == "path":
+            names: list[str] = []
+            if render_cfg.order_by is not None:
+                names.append(render_cfg.order_by)
+            if render_cfg.color_by is not None:
+                names.append(render_cfg.color_by)
+            _require_columns(df, names, context)
+
+        elif render_type == "annotate":
+            names = [name for name in (render_cfg.time_field, render_cfg.value_field) if name]
+            _require_columns(df, names, context)
+
+
 def build_data_layer(cfg: DataLayerConfig, pressure: float) -> ProcessedDataLayer:
     """
     Build one processed runtime layer from a canonical data-layer config.
@@ -229,6 +275,8 @@ def build_data_layer(cfg: DataLayerConfig, pressure: float) -> ProcessedDataLaye
             obs_cfg,
             **{name: runtime_df[name].to_numpy() for name in field_names},
         )
+
+    _validate_render_references(cfg, runtime_df)
 
     return ProcessedDataLayer(
         config=cfg,
