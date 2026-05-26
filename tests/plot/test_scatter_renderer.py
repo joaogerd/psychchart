@@ -38,10 +38,14 @@ def _cfg(**overrides):
         "every": 1,
         "colorbar": False,
         "colorbar_label": None,
+        "colorbar_location": None,
         "colorbar_shrink": None,
         "colorbar_pad": None,
         "colorbar_aspect": None,
+        "colorbar_fraction": None,
         "colorbar_ticks": None,
+        "colorbar_labelpad": None,
+        "colorbar_label_rotation": None,
         "zorder": 45,
     }
     data.update(overrides)
@@ -100,3 +104,36 @@ def test_draw_scatter_applies_colorbar_options():
         "180",
         "200",
     ]
+
+
+def test_draw_scatter_applies_extended_colorbar_layout_options():
+    df = pd.DataFrame(
+        {
+            "_T": [20.0, 22.0, 24.0],
+            "_W": [0.010, 0.011, 0.012],
+            "hour": [0, 1, 2],
+            "cta": [160.0, 180.0, 200.0],
+        }
+    )
+    layer = DummyLayer(df, time_col="hour")
+
+    fig, ax = plt.subplots()
+    draw_scatter(
+        ax,
+        layer,
+        _cfg(
+            colorbar=True,
+            colorbar_label="CTA 19h",
+            colorbar_location="right",
+            colorbar_fraction=0.035,
+            colorbar_pad=0.08,
+            colorbar_labelpad=18,
+            colorbar_label_rotation=270,
+        ),
+    )
+
+    assert len(fig.axes) == 2
+    colorbar_ax = fig.axes[1]
+    assert colorbar_ax.get_ylabel() == "CTA 19h"
+    assert colorbar_ax.yaxis.labelpad == 18
+    assert colorbar_ax.yaxis.label.get_rotation() == 270.0
