@@ -60,10 +60,14 @@ class ScatterRenderConfig(StrictModel):
     every: int = 1
     colorbar: bool = False
     colorbar_label: Optional[str] = None
+    colorbar_location: Optional[Literal["left", "right", "top", "bottom"]] = None
     colorbar_shrink: Optional[float] = None
     colorbar_pad: Optional[float] = None
     colorbar_aspect: Optional[float] = None
+    colorbar_fraction: Optional[float] = None
     colorbar_ticks: Optional[list[float]] = None
+    colorbar_labelpad: Optional[float] = None
+    colorbar_label_rotation: Optional[float] = None
     zorder: int = 45
 
 
