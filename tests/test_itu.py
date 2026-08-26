@@ -1,71 +1,46 @@
-"""
-Unit tests for the Temperature-Humidity Index (ITU).
+"""Tests for the Temperature-Humidity Index (ITU)."""
 
-These tests verify basic physical and empirical properties of the ITU,
-rather than exact numerical values. This approach is recommended for
-empirical thermal comfort indexes, whose formulations are often
-approximate and subject to small variations across references.
-
-Test philosophy
----------------
-The tests below focus on *monotonic behavior*, ensuring that:
-
-- ITU increases with increasing air temperature, all else being equal.
-- ITU increases with increasing relative humidity, all else being equal.
-
-Such properties are fundamental to the physical interpretation of
-thermal comfort and heat stress.
-"""
+import numpy as np
 import pytest
 
 from psychchart.indexes.itu import ITU
 
 
+def test_itu_matches_kelly_bond_azevedo_reference_formula():
+    """Check exact values from the Kelly & Bond form used by Azevedo et al. (2005)."""
+    assert ITU.compute({"T": 30.0, "RH": 0.60}) == pytest.approx(79.84, abs=1e-12)
+    assert ITU.compute({"T": 30.0, "RH": 0.80}) == pytest.approx(82.92, abs=1e-12)
+
+
+def test_vectorized_itu_matches_scalar_reference_values():
+    values = ITU.compute_vectorized(
+        {
+            "T": np.array([30.0, 30.0]),
+            "RH": np.array([0.60, 0.80]),
+        }
+    )
+    assert values == pytest.approx(np.array([79.84, 82.92]), abs=1e-12)
+
+
 def test_itu_increases_with_temperature():
-    """
-    Test that ITU increases monotonically with air temperature.
-
-    For a fixed relative humidity, an increase in dry-bulb temperature
-    must lead to a higher ITU value, reflecting increased thermal stress.
-
-    This test does not validate absolute values, but rather checks
-    the physical consistency of the index behavior.
-    """
-    # Fixed relative humidity (50%)
     rh = 0.5
-
-    # Two temperatures, second higher than the first
     v1 = ITU.compute({"T": 25.0, "RH": rh})
     v2 = ITU.compute({"T": 30.0, "RH": rh})
-
-    # Higher temperature must result in higher ITU
     assert v2 > v1
 
 
 def test_itu_increases_with_humidity():
-    """
-    Test that ITU increases monotonically with relative humidity.
-
-    For a fixed air temperature, an increase in relative humidity
-    reduces evaporative cooling efficiency, which must be reflected
-    as a higher ITU value.
-
-    This test ensures the empirical formulation responds correctly
-    to humidity changes.
-    """
-    # Fixed air temperature (30 °C)
     temperature = 30.0
-
-    # Two humidity levels, second higher than the first
     v1 = ITU.compute({"T": temperature, "RH": 0.4})
     v2 = ITU.compute({"T": temperature, "RH": 0.7})
-
-    # Higher humidity must result in higher ITU
     assert v2 > v1
-    
+
+
 def test_itu_rejects_invalid_rh():
-    """
-    RH must be given as fraction in [0, 1].
-    """
     with pytest.raises(ValueError):
         ITU.compute({"T": 30.0, "RH": 1.2})
+
+    with pytest.raises(ValueError):
+        ITU.compute_vectorized(
+            {"T": np.array([30.0]), "RH": np.array([1.2])}
+        )

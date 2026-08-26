@@ -1,35 +1,55 @@
 # -----------------------------------------------------------------------------
-# Final bovine bioclimatic chart prototype
+# Referência fisiológica de ITU para comparação com a região empírica
+# da dissertação — Azevedo et al. (2005)
 # -----------------------------------------------------------------------------
-# This is the first complete Givoni-like bovine chart prototype for psychChart.
 #
-# It deliberately separates four concepts:
-#   1. psychrometric background;
-#   2. ITU physiological thermal-risk structure;
-#   3. Azevedo et al. (2005) experimental T x RH envelopes;
-#   4. observed/illustrative accumulated-load trajectory.
+# OBJETIVO CIENTÍFICO
+# -------------------
+# Esta figura NÃO representa uma "zona de conforto de Azevedo".
 #
-# This version avoids drawing index_zones as text-heavy legend entries because
-# the ITU meaning is already carried by the colorbar and by the labeled ITU
-# isolines. The article envelopes are drawn as outlines so they remain visible
-# without hiding the ITU field.
+# Azevedo et al. (2005) estimaram níveis críticos superiores de ITU para
+# vacas 1/2, 3/4 e 7/8 Holandês-Zebu. Como a frequência respiratória foi o
+# indicador fisiológico com melhor associação com o ITU naquele estudo, esta
+# configuração usa os limites estimados a partir da frequência respiratória:
+#
+#   7/8 HZ -> ITU 76
+#   3/4 HZ -> ITU 77
+#   1/2 HZ -> ITU 79
+#
+# As regiões coloridas abaixo são REGIÕES PSICROMÉTRICAS DERIVADAS DOS
+# LIMITES FISIOLÓGICOS DE ITU DA LITERATURA. Elas serão usadas como camada
+# de referência para comparar, em etapa posterior, as envoltórias empíricas
+# obtidas na dissertação a partir de CTA + ofegação + persistência temporal.
+#
+# O ITU 72 é mantido apenas como linha secundária porque é o limiar operacional
+# usado na dissertação para calcular excesso térmico e CTA. Ele não é um limite
+# fisiológico estimado por Azevedo et al. (2005).
+#
+# Foram deliberadamente excluídos:
+#   - o campo contínuo/colorbar de ITU, por ser redundante com as quatro regiões
+#     derivadas dos limites fisiológicos;
+#   - envelopes T x UR de manhã/tarde e verão/inverno, porque a Tabela 1 do
+#     artigo fornece amplitudes marginais, não pares conjuntos que definam
+#     polígonos observados;
+#   - limites 84, 89 e 98 como isolinhas principais;
+#   - trajetória CTA ilustrativa e classes sem validação fisiológica no estudo.
 # -----------------------------------------------------------------------------
 
 chart:
   t_min: 10
-  t_max: 45
+  t_max: 40
   y_min: 0.0
-  y_max: 0.035
+  y_max: 0.032
   pressure: 101325
 
-  xlabel: "Dry-bulb temperature (°C)"
-  ylabel: "Humidity ratio (kg/kg dry air)"
-  title: "Bovine bioclimatic chart — Azevedo et al. (2005)"
+  xlabel: "Temperatura de bulbo seco (°C)"
+  ylabel: "Razão de umidade (kg vapor/kg ar seco)"
+  title: "Referências de ITU por frequência respiratória — Azevedo et al. (2005)"
   output: "bovine_bioclimatic_final_azevedo.png"
-  dpi: 220
+  dpi: 300
   style: null
   grid: true
-  figsize: [16, 9]
+  figsize: [13, 8]
 
   show_tw_grid: true
   tw_grid:
@@ -43,34 +63,50 @@ chart:
     color: "#8a8a8a"
     linewidth: 0.45
     linestyle: "-"
-    alpha: 0.22
+    alpha: 0.20
 
   legend:
     show: true
     loc: "upper left"
-    title: "Accumulated thermal-load state"
-    frameon: true
-    fancybox: true
-    framealpha: 0.88
-    borderpad: 0.65
-    labelspacing: 0.45
-    handlelength: 2.0
-    handletextpad: 0.7
-    borderaxespad: 0.75
-    fontsize: 8.5
-    title_fontsize: 9.5
+    title: "Referências fisiológicas"
+    frameon: false
+    fontsize: 8.0
+    title_fontsize: 9.0
+    labelspacing: 0.30
+    handlelength: 2.2
+    handletextpad: 0.6
     entries:
-      - type: classes_from_profile
-        profile: CTA
+      - type: patch
+        label: "ITU < 76 — abaixo dos limites críticos dos três grupos"
+        facecolor: "#B7E4C7"
+        edgecolor: "none"
+      - type: patch
+        label: "ITU 76–77 — acima do limite de 7/8 HZ"
+        facecolor: "#FFE8A1"
+        edgecolor: "none"
+      - type: patch
+        label: "ITU 77–79 — acima dos limites de 7/8 e 3/4 HZ"
+        facecolor: "#F7B267"
+        edgecolor: "none"
+      - type: patch
+        label: "ITU ≥ 79 — acima dos limites críticos dos três grupos"
+        facecolor: "#F28482"
+        edgecolor: "none"
+      - type: line
+        label: "ITU 72 — referência operacional para cálculo da CTA"
+        color: "#777777"
+        alpha: 0.85
+        linewidth: 1.2
+        linestyle: "--"
 
 isolines:
   relative_humidity:
     enabled: true
-    values: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    values: [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
     color: "#6E3F4D"
     linestyle: "-"
-    linewidth: 0.62
-    alpha: 0.46
+    linewidth: 0.60
+    alpha: 0.42
     labels: true
     label_fontsize: 7
     label_fmt: "{value:.0%}"
@@ -98,181 +134,129 @@ isolines:
     label_fmt: null
 
 # -----------------------------------------------------------------------------
-# ITU field and critical isolines
+# Isolinhas de ITU
 # -----------------------------------------------------------------------------
-# The field gives the broad thermal-risk background. The isolines identify the
-# critical values discussed in the article and the conventional stress classes.
+# A fórmula implementada em psychChart é a forma de Kelly & Bond (1971)
+# utilizada por Azevedo et al. (2005):
+#
+#   ITU = TF - 0.55 * (1 - UR) * (TF - 58)
+#
+# em que TF está em graus Fahrenheit e UR é uma fração entre 0 e 1.
+#
+# Os limites de ITU 76, 77 e 79 são desenhados sem rótulo sobre as linhas para
+# evitar sobreposição visual. A interpretação dos intervalos é apresentada na
+# legenda da figura.
 # -----------------------------------------------------------------------------
 indexes:
+  # ITU 72: referência operacional do presente estudo para cálculo de CTA.
   - index: ITU
-    label: "Temperature-Humidity Index (ITU)"
-    levels: [60, 72, 76, 77, 79, 84, 89, 98]
-    cmap: "Spectral_r"
-    vmin: 60
-    vmax: 98
-    render:
-      field:
-        alpha: 0.42
-        colorbar: true
-
-  - index: ITU
-    label: "Critical ITU thresholds"
-    levels: [72, 76, 77, 79, 84, 89]
+    label: "Referência operacional para CTA"
+    levels: [72]
     render:
       isolines:
-        levels: [72, 76, 77, 79, 84, 89]
+        levels: [72]
+        style: "--"
+        color: "#777777"
+        linewidth: 1.2
+        alpha: 0.85
+        label: false
+        label_fontsize: 8
+        label_fmt: "ITU 72"
+
+  # Azevedo et al. (2005): frequência respiratória.
+  - index: ITU
+    label: "7/8 HZ"
+    levels: [76]
+    render:
+      isolines:
+        levels: [76]
+        style: ":"
+        color: "#111111"
+        linewidth: 1.4
+        alpha: 1.0
+        label: false
+        label_fontsize: 9
+        label_fmt: "ITU 76"
+
+  - index: ITU
+    label: "3/4 HZ"
+    levels: [77]
+    render:
+      isolines:
+        levels: [77]
+        style: "-."
+        color: "#111111"
+        linewidth: 1.4
+        alpha: 1.0
+        label: false
+        label_fontsize: 9
+        label_fmt: "ITU 77"
+
+  - index: ITU
+    label: "1/2 HZ"
+    levels: [79]
+    render:
+      isolines:
+        levels: [79]
         style: "-"
         color: "#111111"
-        linewidth: 1.05
-        alpha: 0.92
-        label: true
-        label_fontsize: 8
-        label_fmt: "ITU {value:.0f}"
-
-# NOTE:
-# index_zones are intentionally disabled in this final figure because their
-# automatic textual entries compete with the plot legend. The ITU classification
-# is still represented by the field levels, colorbar, and isolines.
-index_zones: []
-
-# -----------------------------------------------------------------------------
-# Azevedo et al. (2005) experimental envelopes
-# -----------------------------------------------------------------------------
-# These are descriptive T x RH ranges observed in the article. They are not
-# comfort zones by themselves.
-# -----------------------------------------------------------------------------
-zones:
-  - name: "Experimental envelope"
-    t_range: [10, 34]
-    rh_range: [26, 100]
-    follow_rh: true
-    edgecolor: "#111111"
-    facecolor: "none"
-    linewidth: 3.0
-    alpha: 0.0
-    show_label: true
-    label: "Experimental envelope\n10–34 °C | RH 26–100%"
-    label_t: 16.3
-    label_rh: 90
-    label_color: "#111111"
-    label_fontsize: 9.0
-    label_rotation: 0
-
-  - name: "Winter morning"
-    t_range: [10, 25]
-    rh_range: [48, 100]
-    follow_rh: true
-    edgecolor: "#1F77B4"
-    facecolor: "none"
-    linewidth: 2.2
-    alpha: 0.0
-    show_label: true
-    label: "Winter\nmorning"
-    label_t: 16.0
-    label_rh: 63
-    label_color: "#1F77B4"
-    label_fontsize: 9.0
-
-  - name: "Winter afternoon"
-    t_range: [18, 31]
-    rh_range: [26, 90]
-    follow_rh: true
-    edgecolor: "#2E7D32"
-    facecolor: "none"
-    linewidth: 2.2
-    alpha: 0.0
-    show_label: true
-    label: "Winter\nafternoon"
-    label_t: 24.5
-    label_rh: 34
-    label_color: "#2E7D32"
-    label_fontsize: 9.0
-
-  - name: "Summer morning"
-    t_range: [18, 29]
-    rh_range: [52, 100]
-    follow_rh: true
-    edgecolor: "#B7950B"
-    facecolor: "none"
-    linewidth: 2.4
-    alpha: 0.0
-    show_label: true
-    label: "Summer\nmorning"
-    label_t: 22.8
-    label_rh: 81
-    label_color: "#8A6D00"
-    label_fontsize: 9.0
-
-  - name: "Summer afternoon"
-    t_range: [21, 34]
-    rh_range: [33, 100]
-    follow_rh: true
-    edgecolor: "#C0392B"
-    facecolor: "none"
-    linewidth: 2.5
-    alpha: 0.0
-    show_label: true
-    label: "Summer\nafternoon"
-    label_t: 30.0
-    label_rh: 47
-    label_color: "#922B21"
-    label_fontsize: 9.0
-
-# -----------------------------------------------------------------------------
-# Example temporal trajectory classified by accumulated thermal load
-# -----------------------------------------------------------------------------
-data_layers:
-  - data: "examples/data/animal_day.csv"
-    format: "csv"
-
-    projection:
-      t_col: temp
-      rh_col: rh
-      rh_unit: auto
-
-    temporal:
-      time_col: hour
-      sort: true
-
-    fields:
-      - type: direct_column
-        name: CTA
-        col: cta_acumulada
-
-    render:
-      - type: path
-        order_by: hour
-        color: "#264653"
-        alpha: 0.88
-        linewidth: 2.4
-        linestyle: "-"
-        label: "Thermal trajectory"
-        zorder: 42
-
-      - type: classified_points
-        value_col: CTA
-        profile: CTA
-        order_by: hour
-        size: 58
+        linewidth: 1.5
         alpha: 1.0
-        edgecolor: "#111111"
-        edgewidth: 0.75
-        marker: "o"
-        label: "Hourly accumulated-load state"
-        zorder: 45
+        label: false
+        label_fontsize: 9
+        label_fmt: "ITU 79"
 
-      - type: annotate
-        every: 2
-        template: "{time:.0f}h"
-        time_field: hour
-        value_field: CTA
-        dx: 0.035
-        dy: 0.00055
-        fontsize: 7.8
-        fontweight: bold
-        color: "#111111"
-        zorder: 50
+# -----------------------------------------------------------------------------
+# Regiões psicrométricas derivadas dos limites fisiológicos de Azevedo et al.
+# -----------------------------------------------------------------------------
+# Não são zonas universais de conforto. Elas indicam apenas a posição de cada
+# combinação T x UR em relação aos limites críticos superiores estimados com
+# frequência respiratória no estudo de Azevedo et al. (2005).
+#
+# show_label=true com um rótulo em branco suprime o fallback textual automático
+# do renderer; a semântica das regiões é apresentada pela legenda declarativa.
+# -----------------------------------------------------------------------------
+index_zones:
+  - index: ITU
+    name: "abaixo dos três limites críticos"
+    range: [0, 76]
+    color: "#B7E4C7"
+    alpha: 0.22
+    show_label: true
+    label: " "
 
+  - index: ITU
+    name: "acima do limite de 7/8 HZ"
+    range: [76, 77]
+    color: "#FFE8A1"
+    alpha: 0.28
+    show_label: true
+    label: " "
+
+  - index: ITU
+    name: "acima dos limites de 7/8 e 3/4 HZ"
+    range: [77, 79]
+    color: "#F7B267"
+    alpha: 0.28
+    show_label: true
+    label: " "
+
+  - index: ITU
+    name: "acima dos três limites críticos"
+    range: [79, 200]
+    color: "#F28482"
+    alpha: 0.20
+    show_label: true
+    label: " "
+
+# -----------------------------------------------------------------------------
+# A região empírica da dissertação será adicionada aqui como geometria explícita
+# (vértices em T x UR), após exportação reprodutível dos polígonos núcleo,
+# transição e limite gerados pelo pipeline de conforto.
+# -----------------------------------------------------------------------------
+zones: []
+
+data_layers: []
 points: []
 observations: []
 temporal_overlays: []
