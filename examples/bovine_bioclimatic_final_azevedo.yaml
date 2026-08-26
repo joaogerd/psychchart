@@ -16,8 +16,8 @@
 #   3/4 HZ -> ITU 77
 #   1/2 HZ -> ITU 79
 #
-# As regiões coloridas abaixo são, portanto, REGIÕES PSICROMÉTRICAS DERIVADAS
-# DOS LIMITES FISIOLÓGICOS DE ITU DA LITERATURA. Elas serão usadas como camada
+# As regiões coloridas abaixo são REGIÕES PSICROMÉTRICAS DERIVADAS DOS
+# LIMITES FISIOLÓGICOS DE ITU DA LITERATURA. Elas serão usadas como camada
 # de referência para comparar, em etapa posterior, as envoltórias empíricas
 # obtidas na dissertação a partir de CTA + ofegação + persistência temporal.
 #
@@ -25,7 +25,9 @@
 # usado na dissertação para calcular excesso térmico e CTA. Ele não é um limite
 # fisiológico estimado por Azevedo et al. (2005).
 #
-# Foram removidos desta figura:
+# Foram deliberadamente excluídos:
+#   - o campo contínuo/colorbar de ITU, por ser redundante com as quatro regiões
+#     derivadas dos limites fisiológicos;
 #   - envelopes T x UR de manhã/tarde e verão/inverno, porque a Tabela 1 do
 #     artigo fornece amplitudes marginais, não pares conjuntos que definam
 #     polígonos observados;
@@ -42,7 +44,7 @@ chart:
 
   xlabel: "Temperatura de bulbo seco (°C)"
   ylabel: "Razão de umidade (kg vapor/kg ar seco)"
-  title: "Referências fisiológicas de ITU — Azevedo et al. (2005)"
+  title: "Limites fisiológicos de ITU em vacas Holandês-Zebu — Azevedo et al. (2005)"
   output: "bovine_bioclimatic_final_azevedo.png"
   dpi: 300
   style: null
@@ -62,6 +64,14 @@ chart:
     linewidth: 0.45
     linestyle: "-"
     alpha: 0.20
+
+  legend:
+    show: true
+    loc: "upper left"
+    title: "Regiões derivadas dos limites de frequência respiratória"
+    frameon: false
+    fontsize: 8.5
+    title_fontsize: 9.0
 
 isolines:
   relative_humidity:
@@ -98,94 +108,112 @@ isolines:
     label_fmt: null
 
 # -----------------------------------------------------------------------------
-# Campo de ITU
+# Isolinhas de ITU
 # -----------------------------------------------------------------------------
-# A formula implementada em psychChart é a forma de Kelly & Bond (1971)
+# A fórmula implementada em psychChart é a forma de Kelly & Bond (1971)
 # utilizada por Azevedo et al. (2005):
 #
 #   ITU = TF - 0.55 * (1 - UR) * (TF - 58)
 #
 # em que TF está em graus Fahrenheit e UR é uma fração entre 0 e 1.
+#
+# As três isolinhas fisiológicas são declaradas separadamente para que cada
+# uma carregue diretamente no gráfico o grupo genético ao qual se refere.
 # -----------------------------------------------------------------------------
 indexes:
-  - index: ITU
-    label: "Índice de Temperatura e Umidade (ITU)"
-    levels: [55, 65, 72, 76, 77, 79, 85, 95]
-    cmap: "Spectral_r"
-    vmin: 55
-    vmax: 95
-    render:
-      field:
-        alpha: 0.22
-        colorbar: true
-
   # ITU 72: referência operacional do presente estudo para cálculo de CTA.
   - index: ITU
-    label: "Referência operacional do presente estudo"
+    label: "Referência operacional para CTA"
     levels: [72]
     render:
       isolines:
         levels: [72]
         style: "--"
-        color: "#666666"
+        color: "#777777"
         linewidth: 1.0
-        alpha: 0.85
+        alpha: 0.75
         label: true
-        label_fontsize: 8
-        label_fmt: "ITU {value:.0f}"
+        label_fontsize: 7.5
+        label_fmt: "ITU 72 — referência CTA"
 
-  # Limites críticos superiores estimados por Azevedo et al. (2005),
-  # considerando a frequência respiratória.
+  # Azevedo et al. (2005): frequência respiratória.
   - index: ITU
-    label: "Limites críticos superiores — frequência respiratória"
-    levels: [76, 77, 79]
+    label: "7/8 HZ"
+    levels: [76]
     render:
       isolines:
-        levels: [76, 77, 79]
+        levels: [76]
         style: "-"
         color: "#111111"
         linewidth: 1.5
         alpha: 1.0
         label: true
-        label_fontsize: 9
-        label_fmt: "ITU {value:.0f}"
+        label_fontsize: 8.5
+        label_fmt: "7/8 HZ — ITU 76"
+
+  - index: ITU
+    label: "3/4 HZ"
+    levels: [77]
+    render:
+      isolines:
+        levels: [77]
+        style: "-"
+        color: "#111111"
+        linewidth: 1.5
+        alpha: 1.0
+        label: true
+        label_fontsize: 8.5
+        label_fmt: "3/4 HZ — ITU 77"
+
+  - index: ITU
+    label: "1/2 HZ"
+    levels: [79]
+    render:
+      isolines:
+        levels: [79]
+        style: "-"
+        color: "#111111"
+        linewidth: 1.5
+        alpha: 1.0
+        label: true
+        label_fontsize: 8.5
+        label_fmt: "1/2 HZ — ITU 79"
 
 # -----------------------------------------------------------------------------
-# Regiões fisiológicas derivadas dos limites de Azevedo et al. (2005)
+# Regiões psicrométricas derivadas dos limites fisiológicos de Azevedo et al.
 # -----------------------------------------------------------------------------
-# Estas regiões não devem ser chamadas de zonas universais de conforto.
-# Elas apenas projetam no espaço psicrométrico a posição relativa de cada
-# combinação T x UR em relação aos limites críticos superiores de ITU obtidos
-# com frequência respiratória no estudo de Azevedo et al. (2005).
+# Não são zonas universais de conforto. Elas indicam apenas a posição de cada
+# combinação T x UR em relação aos limites críticos superiores estimados com
+# frequência respiratória no estudo de Azevedo et al. (2005).
 # -----------------------------------------------------------------------------
 index_zones:
   - index: ITU
-    name: "Abaixo dos limites críticos de FR dos três grupos (ITU < 76)"
+    name: "ITU < 76 — abaixo dos três limites críticos"
     range: [0, 76]
     color: "#B7E4C7"
     alpha: 0.22
 
   - index: ITU
-    name: "Entre os limites de 7/8 e 3/4 HZ (ITU 76–77)"
+    name: "ITU 76–77 — acima do limite de 7/8 HZ"
     range: [76, 77]
     color: "#FFE8A1"
     alpha: 0.28
 
   - index: ITU
-    name: "Entre os limites de 3/4 e 1/2 HZ (ITU 77–79)"
+    name: "ITU 77–79 — acima dos limites de 7/8 e 3/4 HZ"
     range: [77, 79]
     color: "#F7B267"
     alpha: 0.28
 
   - index: ITU
-    name: "Acima dos limites críticos de FR dos três grupos (ITU > 79)"
+    name: "ITU ≥ 79 — acima dos três limites críticos"
     range: [79, 200]
     color: "#F28482"
     alpha: 0.20
 
 # -----------------------------------------------------------------------------
 # A região empírica da dissertação será adicionada aqui como geometria explícita
-# (vertices em T x UR), após exportação reprodutível dos polígonos núcleo,
+# (vértices em T x UR), após exportação reprodutível dos polígonos núcleo,
 # transição e limite gerados pelo pipeline de conforto.
 # -----------------------------------------------------------------------------
 zones: []
