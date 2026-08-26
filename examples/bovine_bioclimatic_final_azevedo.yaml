@@ -44,7 +44,7 @@ chart:
 
   xlabel: "Temperatura de bulbo seco (°C)"
   ylabel: "Razão de umidade (kg vapor/kg ar seco)"
-  title: "Limites fisiológicos de ITU em vacas Holandês-Zebu — Azevedo et al. (2005)"
+  title: "Referências de ITU por frequência respiratória — Azevedo et al. (2005)"
   output: "bovine_bioclimatic_final_azevedo.png"
   dpi: 300
   style: null
@@ -68,10 +68,36 @@ chart:
   legend:
     show: true
     loc: "upper left"
-    title: "Regiões derivadas dos limites de frequência respiratória"
+    title: "Referências fisiológicas"
     frameon: false
-    fontsize: 8.5
+    fontsize: 8.0
     title_fontsize: 9.0
+    labelspacing: 0.30
+    handlelength: 2.2
+    handletextpad: 0.6
+    entries:
+      - type: patch
+        label: "ITU < 76 — abaixo dos limites críticos dos três grupos"
+        facecolor: "#B7E4C7"
+        edgecolor: "none"
+      - type: patch
+        label: "ITU 76–77 — acima do limite de 7/8 HZ"
+        facecolor: "#FFE8A1"
+        edgecolor: "none"
+      - type: patch
+        label: "ITU 77–79 — acima dos limites de 7/8 e 3/4 HZ"
+        facecolor: "#F7B267"
+        edgecolor: "none"
+      - type: patch
+        label: "ITU ≥ 79 — acima dos limites críticos dos três grupos"
+        facecolor: "#F28482"
+        edgecolor: "none"
+      - type: line
+        label: "ITU 72 — referência operacional para cálculo da CTA"
+        color: "#777777"
+        alpha: 0.85
+        linewidth: 1.2
+        linestyle: "--"
 
 isolines:
   relative_humidity:
@@ -117,8 +143,9 @@ isolines:
 #
 # em que TF está em graus Fahrenheit e UR é uma fração entre 0 e 1.
 #
-# As três isolinhas fisiológicas são declaradas separadamente para que cada
-# uma carregue diretamente no gráfico o grupo genético ao qual se refere.
+# Os limites de ITU 76, 77 e 79 são desenhados sem rótulo sobre as linhas para
+# evitar sobreposição visual. A interpretação dos intervalos é apresentada na
+# legenda da figura.
 # -----------------------------------------------------------------------------
 indexes:
   # ITU 72: referência operacional do presente estudo para cálculo de CTA.
@@ -130,11 +157,11 @@ indexes:
         levels: [72]
         style: "--"
         color: "#777777"
-        linewidth: 1.0
-        alpha: 0.75
-        label: true
+        linewidth: 1.2
+        alpha: 0.85
+        label: false
         label_fontsize: 8
-        label_fmt: "ITU 72 — referência CTA"
+        label_fmt: "ITU 72"
 
   # Azevedo et al. (2005): frequência respiratória.
   - index: ITU
@@ -143,13 +170,13 @@ indexes:
     render:
       isolines:
         levels: [76]
-        style: "-"
+        style: ":"
         color: "#111111"
-        linewidth: 1.5
+        linewidth: 1.4
         alpha: 1.0
-        label: true
+        label: false
         label_fontsize: 9
-        label_fmt: "7/8 HZ — ITU 76"
+        label_fmt: "ITU 76"
 
   - index: ITU
     label: "3/4 HZ"
@@ -157,13 +184,13 @@ indexes:
     render:
       isolines:
         levels: [77]
-        style: "-"
+        style: "-."
         color: "#111111"
-        linewidth: 1.5
+        linewidth: 1.4
         alpha: 1.0
-        label: true
+        label: false
         label_fontsize: 9
-        label_fmt: "3/4 HZ — ITU 77"
+        label_fmt: "ITU 77"
 
   - index: ITU
     label: "1/2 HZ"
@@ -175,9 +202,9 @@ indexes:
         color: "#111111"
         linewidth: 1.5
         alpha: 1.0
-        label: true
+        label: false
         label_fontsize: 9
-        label_fmt: "1/2 HZ — ITU 79"
+        label_fmt: "ITU 79"
 
 # -----------------------------------------------------------------------------
 # Regiões psicrométricas derivadas dos limites fisiológicos de Azevedo et al.
@@ -185,31 +212,42 @@ indexes:
 # Não são zonas universais de conforto. Elas indicam apenas a posição de cada
 # combinação T x UR em relação aos limites críticos superiores estimados com
 # frequência respiratória no estudo de Azevedo et al. (2005).
+#
+# show_label=true com um rótulo em branco suprime o fallback textual automático
+# do renderer; a semântica das regiões é apresentada pela legenda declarativa.
 # -----------------------------------------------------------------------------
 index_zones:
   - index: ITU
-    name: "ITU < 76 — abaixo dos três limites críticos"
+    name: "abaixo dos três limites críticos"
     range: [0, 76]
     color: "#B7E4C7"
     alpha: 0.22
+    show_label: true
+    label: " "
 
   - index: ITU
-    name: "ITU 76–77 — acima do limite de 7/8 HZ"
+    name: "acima do limite de 7/8 HZ"
     range: [76, 77]
     color: "#FFE8A1"
     alpha: 0.28
+    show_label: true
+    label: " "
 
   - index: ITU
-    name: "ITU 77–79 — acima dos limites de 7/8 e 3/4 HZ"
+    name: "acima dos limites de 7/8 e 3/4 HZ"
     range: [77, 79]
     color: "#F7B267"
     alpha: 0.28
+    show_label: true
+    label: " "
 
   - index: ITU
-    name: "ITU ≥ 79 — acima dos três limites críticos"
+    name: "acima dos três limites críticos"
     range: [79, 200]
     color: "#F28482"
     alpha: 0.20
+    show_label: true
+    label: " "
 
 # -----------------------------------------------------------------------------
 # A região empírica da dissertação será adicionada aqui como geometria explícita
