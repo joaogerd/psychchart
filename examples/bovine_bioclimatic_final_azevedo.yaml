@@ -133,7 +133,7 @@ indexes:
         linewidth: 1.0
         alpha: 0.75
         label: true
-        label_fontsize: 7.5
+        label_fontsize: 8
         label_fmt: "ITU 72 — referência CTA"
 
   # Azevedo et al. (2005): frequência respiratória.
@@ -148,7 +148,7 @@ indexes:
         linewidth: 1.5
         alpha: 1.0
         label: true
-        label_fontsize: 8.5
+        label_fontsize: 9
         label_fmt: "7/8 HZ — ITU 76"
 
   - index: ITU
@@ -162,7 +162,7 @@ indexes:
         linewidth: 1.5
         alpha: 1.0
         label: true
-        label_fontsize: 8.5
+        label_fontsize: 9
         label_fmt: "3/4 HZ — ITU 77"
 
   - index: ITU
@@ -176,7 +176,7 @@ indexes:
         linewidth: 1.5
         alpha: 1.0
         label: true
-        label_fontsize: 8.5
+        label_fontsize: 9
         label_fmt: "1/2 HZ — ITU 79"
 
 # -----------------------------------------------------------------------------
